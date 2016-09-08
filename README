@@ -1,0 +1,45 @@
+secure-environment
+==================
+
+This layer provides the following common and platform-specific security
+features:
+
+- UEFI Secure Boot
+For x86 platform, UEFI secure boot is the industry standard defined in the UEFI
+spec, allowing images loaded by UEFI BIOS to be verified with the trusted
+key. Whenever this feature is enabled, the bootloader and kernel will be
+signed automatically during the build, implying the signed binaries are
+contained by the resulting RPM and rootfs image.
+
+Refer to feature/uefi-secure-boot/README for more details.
+
+- User key store
+By default, the signing key used by UEFI secure boot is the sample key for
+the purposes of development and demonstration. It is not recommended that
+this sample key be used for a production device and should be replaced by
+a secret key owned by the user. 
+
+Refer to feature/user-key-store-test/README for more details about how to
+construct an user key store.
+
+- User key store test
+This feature automatically constructs an user key store during the build.
+In a similar manner to the case of using sample key, all related binaries
+are signed and contained in RPM and rootfs image. In addition, the resulting
+user key store is located at $build/tmp/deploy/images/<machine>/user-keys/.
+
+
+Maintenance
+-----------
+This layer is maintained in Wind River Open Source Labs at github.
+* source	https://github.com/WindRiver-OpenSourceLabs/wrlabs-integration
+
+
+Building the secure-environment layer
+-------------------------------------
+This layer should be added to the bblayers.conf file. To enable certain
+feature provided by this layer, add the feature to the local.conf file. 
+
+For pulsar binary release, this layer is included by default ,and UEFI
+secure boot feature is enabled by default for x86 machine. These are done
+in the init-intel-x86-env file.
