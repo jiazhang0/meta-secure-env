@@ -1,0 +1,31 @@
+From 2f1cde27980b183b313fc6b7e8e8738c81bca5ae Mon Sep 17 00:00:00 2001
+From: Lans Zhang <jia.zhang@windriver.com>
+Date: Mon, 21 Mar 2016 16:08:26 +0800
+Subject: [PATCH] shim: fix the handling EFI_SECURITY_VIOLATION
+
+Upstream-Status: Pending
+
+start_image() is unable to return EFI_SECURITY_VIOLATION. Instead, the
+security violations return EFI_ACCESS_DENIED in shim's context.
+
+Signed-off-by: Lans Zhang <jia.zhang@windriver.com>
+---
+ shim.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/shim.c b/shim.c
+index fc18385..2da5403 100644
+--- a/shim.c
++++ b/shim.c
+@@ -1738,7 +1738,7 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
+ 
+ 	efi_status = start_image(image_handle, use_fb ? FALLBACK :second_stage);
+ 
+-	if (efi_status == EFI_SECURITY_VIOLATION) {
++	if (efi_status == EFI_ACCESS_DENIED) {
+ 		efi_status = start_image(image_handle, MOK_MANAGER);
+ 		if (efi_status != EFI_SUCCESS) {
+ 			Print(L"start_image() returned %r\n", efi_status);
+-- 
+1.9.1
+
