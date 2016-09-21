@@ -13,8 +13,16 @@ contained by the resulting RPM and rootfs image.
 
 Refer to feature/uefi-secure-boot/README for more details.
 
+- Mok Secure Boot
+For x86 platform, Mok secure boot is based on the UEFI secure boot, adding
+the shim loader to chainloader the second-stage bootloader. Meanwhile,
+the shim will also install a protocol which permits the second-stage bootloader
+to perform similar binary validation, e.g, for linux kernel.
+
+Refer to feature/mok-secure-boot/README for more details.
+
 - User key store
-By default, the signing key used by UEFI secure boot is the sample key for
+By default, the signing key used by UEFI/Mok secure boot is the sample key for
 the purposes of development and demonstration. It is not recommended that
 this sample key be used for a production device and should be replaced by
 a secret key owned by the user. 
@@ -40,6 +48,6 @@ Building the secure-environment layer
 This layer should be added to the bblayers.conf file. To enable certain
 feature provided by this layer, add the feature to the local.conf file. 
 
-For pulsar binary release, this layer is included by default ,and UEFI
+For pulsar binary release, this layer is included by default, and UEFI/Mok
 secure boot feature is enabled by default for x86 machine. These are done
 in the init-intel-x86-env file.
