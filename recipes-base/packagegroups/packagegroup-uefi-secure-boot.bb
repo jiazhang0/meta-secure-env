@@ -2,7 +2,7 @@
 # Copyright (C) 2016 Wind River Systems Inc.
 #
 
-DESCRIPTION = "UEFI secure boot packages for wr-secure."
+DESCRIPTION = "UEFI secure boot packages for secure-environment."
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COREBASE}/LICENSE;md5=4d92cd373abda3937c2bc47fbc49d690 \
                     file://${COREBASE}/meta/COPYING.MIT;md5=3da9cfbcb788c80a0384361b4de20420"
@@ -10,7 +10,7 @@ LIC_FILES_CHKSUM = "file://${COREBASE}/LICENSE;md5=4d92cd373abda3937c2bc47fbc49d
 ALLOW_EMPTY_${PN} = "1"
 ALLOW_EMPTY_${PN}-net = "1"
 
-# Packages added by/for the wr-secure layer
+# Packages added by/for the secure-environment layer
 pkgs = " \
     grub-efi \
     efitools \
