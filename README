@@ -1,5 +1,5 @@
-secure-environment
-==================
+meta-secure-env
+===============
 
 This layer provides the following common and platform-specific security
 features:
@@ -43,8 +43,8 @@ This layer is maintained in Wind River Open Source Labs at github.
 * source	https://github.com/WindRiver-OpenSourceLabs/wrlabs-integration
 
 
-Building the secure-environment layer
--------------------------------------
+Building the meta-secure-env layer
+----------------------------------
 This layer should be added to the bblayers.conf file. To enable certain
 feature provided by this layer, add the feature to the local.conf file. 
 
