@@ -40,7 +40,7 @@ user key store is located at $build/tmp/deploy/images/<machine>/user-keys/.
 Maintenance
 -----------
 This layer is maintained in Wind River Open Source Labs at github.
-* source	https://github.com/WindRiver-OpenSourceLabs/wrlabs-integration
+* source	https://github.com/WindRiver-OpenSourceLabs/meta-secure-env
 
 
 Building the meta-secure-env layer

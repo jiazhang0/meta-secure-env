@@ -77,8 +77,8 @@ and demonstration. Please ensure you know what your risk is to use them in
 your product.
 
 The sample keys are centrally placed under
-layers/wrlabs-integration/secure-environment/file/mok_sb_keys.
-This template uses the following key pair:
+layers/meta-secure-env/file/mok_sb_keys. This template uses the following key
+pair:
 
   * shim_cert.pem
     The X509 certificate embedded in shim, used to verify the images either
