@@ -36,6 +36,14 @@ In a similar manner to the case of using sample key, all related binaries
 are signed and contained in RPM and rootfs image. In addition, the resulting
 user key store is located at $build/tmp/deploy/images/<machine>/user-keys/.
 
+- TPM 2.0
+This feature enables Trusted Platform Module (TPM 2.0) support, including
+kernel option changes to enable tpm drivers, and picking up TPM 2.0 packages.
+
+Trusted Platform Module (TPM 2.0) is a microcontroller that stores keys,
+passwords, and digital certificates. A discrete TPM 2.0 offers the
+capabilities as part of the overall platform security requirements.
+
 
 Maintenance
 -----------
