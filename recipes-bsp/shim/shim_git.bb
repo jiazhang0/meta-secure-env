@@ -130,5 +130,8 @@ do_deploy() {
 
     install -m 0600 ${B}/shim${EFI_ARCH}.efi ${DEPLOYDIR}/efi-unsigned/boot${EFI_ARCH}.efi
     install -m 0600 ${B}/mm${EFI_ARCH}.efi ${DEPLOYDIR}/efi-unsigned/mm${EFI_ARCH}.efi
+
+    install -m 0600 "${D}${EFI_TARGET}/boot${EFI_ARCH}.efi" "${DEPLOYDIR}"
+    install -m 0600 "${D}${EFI_TARGET}/mm${EFI_ARCH}.efi" "${DEPLOYDIR}"
 }
 addtask deploy after do_install before do_build
