@@ -1,0 +1,45 @@
+From e58e250f097b80d1a55cc13e418e3c1166fd4b12 Mon Sep 17 00:00:00 2001
+From: Haiqing Bai <Haiqing.Bai@windriver.com>
+Date: Tue, 1 Dec 2015 13:39:46 +0800
+Subject: [PATCH] Added logic to check the autosigned rpm packages.
+
+During install when signature checking ok, check whether
+the package is autosigned, if yes terminate the install.
+
+Signed-off-by: Haiqing Bai <Haiqing.Bai@windriver.com>
+---
+ smart/backends/rpm/pm.py | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/smart/backends/rpm/pm.py b/smart/backends/rpm/pm.py
+index ff02d21..0788ac3 100644
+--- a/smart/backends/rpm/pm.py
++++ b/smart/backends/rpm/pm.py
+@@ -24,6 +24,7 @@ import tempfile
+ import sys, os
+ import codecs
+ import locale
++import commands
+
+ from smart.util.filetools import setCloseOnExec
+ from smart.sorter import ChangeSetSorter
+@@ -184,6 +185,16 @@ class RPMPackageManager(PackageManager):
+                     if sysconf.get("rpm-check-signatures", True):
+                          if get_public_key(h) == '(none)':
+                              raise rpm.error('package is not signed')
++                         else:
++                             if os.path.exists(path):
++                                 (cstatus, coutput) = commands.getstatusoutput("rpm -Kv %s | grep 'signature: OK' | grep 'key ID'" %(path))
++                                 if not cstatus:
++                                     idx = coutput.find('key ID')+7
++                                     tkid = coutput[idx:].strip()
++                                     if tkid:
++                                         if os.path.exists("/tmp/.%s" %(tkid)):
++                                             raise rpm.error('package is not customer signed')
++
+                 except rpm.error, e:
+                     os.close(fd)
+                     raise Error, "%s: %s" % (os.path.basename(path), e)
+--
+1.9.1
+
