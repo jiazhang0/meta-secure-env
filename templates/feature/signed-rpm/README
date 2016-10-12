@@ -1,0 +1,20 @@
+Signed RPMs(GPG) Feature
+========================
+
+RPM supports GPG signatures to retain the integrity of the RPM. Once signed,
+the systems with the corresponding public key imported can verify that no
+modifications occurred after the data was signed. This feature enables
+customer signed-rpm(GPG) support. It imports the customer's public key into
+the systems that uses the repo. In the meantime it marks the auto-signed
+packages' as untrusted.
+
+By default a Pulsar public key is provided so that user will trust repos from
+official Pulsar releases. If customer want to use their own key and
+maintaining their own repo, there are two way to achieve this:
+
+1. Directly replace the public key files/rpm_public_key/pub.key
+   NOTE: be sure to use the exact same name so that the build system can find
+it.
+
+2. Redefine RPM_PUBLIB_KEY in the template.conf
+
