@@ -1,0 +1,14 @@
+[Unit]
+Description=RPM import key service
+After=local-fs.target
+Before=lxc.service
+
+[Service]
+Type=oneshot
+#Only run on first boot
+ExecStart=/bin/sh -c "rpm --import /etc/pub.key"
+ExecStartPost=/bin/systemctl disable rpm-import-key.service
+RemainAfterExit=No
+
+[Install]
+WantedBy=multi-user.target
