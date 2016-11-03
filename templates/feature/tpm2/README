@@ -31,18 +31,19 @@ capabilities available in the TPM. For how to use, the manual file in package
 is a good place to start. Project homepage:
     https://github.com/01org/tpm2.0-tools
 
-Setup
-=====
+Clear TPM
+=========
 
 For TPM 2.0, the following typical steps can be performed to get the TPM
 ready for use:
 
-1. Clear and enable TPM from the BIOS.
+1. Clear and enable TPM from the BIOS or set the security jumper on the board.
 
-2. Take TPM ownership, setting Owner/Endorsement/Lockout passwords.
-   These passwords are used for the access permission to other functions.
+2. Take TPM ownership, setting Owner/Endorsement/Lockout passwords if
+   necessary. These passwords are used for the authorization to certain
+   TPM 2.0 commands.
 
-     # tpm2_takeownership  -o <ownerPasswd> -e <endorsePasswd> -l <lockPasswd>
+     # tpm2_takeownership -o <ownerPasswd> -e <endorsePasswd> -l <lockPasswd>
 
 Then, you can use the TPM for a specific need, such as key generation,
 sealing encrypted data, etc.
