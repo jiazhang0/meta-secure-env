@@ -4,6 +4,9 @@ This feature enables tpm 1.2 support, including kernel option changes to enable 
 drivers, and picking up packages trousers, tpm-tools, openssl-tpm-engine, tpm-quote-tools.
 Note, testing package tss-testsuite isn't included in this feature.
 
+Note:
+TPM 1.2 is not validated in this release.
+
 TPM 1.2 packages
 ================
 The following open-source packages are supported for TPM 1.2.
