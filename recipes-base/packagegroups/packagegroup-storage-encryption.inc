@@ -26,6 +26,7 @@ RDEPENDS_${PN} = " \
     libtss2 \
     libtctidevice \
     libtctisocket \
+    resourcemgr \
     cryptfs-tpm2 \
 "
 
