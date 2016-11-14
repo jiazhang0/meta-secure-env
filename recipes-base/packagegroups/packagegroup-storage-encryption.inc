@@ -26,6 +26,7 @@ RDEPENDS_${PN} = " \
     libtss2 \
     libtctidevice \
     libtctisocket \
+    cryptfs-tpm2 \
 "
 
 RRECOMMENDS_${PN} = "kernel-module-tpm-tis"
