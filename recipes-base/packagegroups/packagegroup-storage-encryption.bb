@@ -4,7 +4,7 @@
 
 include packagegroup-storage-encryption.inc
 
-DESCRIPTION = "The storage-encryption packages for wr-secure."
+DESCRIPTION = "The storage-encryption packages for rootfs."
 
 # Install the minimal stuffs only for the linux rootfs.
 # The common packages shared between initramfs and rootfs
