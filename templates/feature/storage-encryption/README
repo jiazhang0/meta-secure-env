@@ -62,6 +62,8 @@ In runtime, for example, create LUKS partition on /dev/sdb1 with the
 name "my_luks_part":
 # luks-setup.sh -d /dev/sdb1 -n my_luks_name
 
+Note: if TPM is detected, the passphrase will be generated automatically.
+
 Next refer to "Create the filesystem/volume on the LUKS partition" to manually
 create the filesystem/volume.
 
@@ -87,22 +89,19 @@ CRYPTFS_TPM2_PASSPHRASE_SECRET in cryptfs-tpm2 for your preference.
 4. The instruction below with the prefix "[TPM]" indicate the operation
 requires TPM hardware. Oppositely, the prefix "[Non-TPM]" indicates this
 operation is required if the target board doesn't have a working TPM hardware
-5. For development purpose, if the filename "passphrase" is present on the
-$boot, it will be handled by the /init.cryptfs in top priority even prior
-to using "encrypted_passphrase".
+5. If TPM is not present on target board, the passphrase will have to be
+typed whenever creating the LUKS partition or mounting it during the boot.
 
 Preparation
 -----------
 - Ensure a hard drive is attached on target board
-Note the following instrictions will wipe all data in the hard drive.
+Note the following instructions will wipe all data in the hard drive.
 
-- Create the usb image
-$ cd $project
-$ make usb-image
+- Create overc installer on a USB device
+Refer to layers/meta-overc/README.install for the details about how to
+run cubeit to install overc installer to a USB device.
 
-- Deploy the usb image to a USB drive
-
-- Attach the boot device to the board
+- Attach the USB device to the board
 
 - Power on
 
@@ -111,148 +110,12 @@ Refer to feature/tpm2/README for the details.
 
 - Boot to Linux
 
-Use case 1: manual operation
-----------------------------
+- Install overc runtime on the hard drive
+Refer to layers/meta-overc/README.install for the details about how to
+run cubeit-installer to install overc runtime to a hard drive. In
+addition, beware of specifying "--encryption" option to set up an
+encrypted rootfs.
 
-Creation
-~~~~~~~~
-- Create at least 2 partitions on hard drive
-  * The first partition is used to boot system, called $boot.
-  * The second partition is the rootfs with the data encryption, called
-    $rootfs.
-
-- [TPM] Generate enough entropies for initialization
-# modprobe tpm-rng
-# rngd
-# export TSS_TCSD_HOSTNAME=127.0.0.1
-
-- [TPM] Create the encrypted passphrase file
-# mount /dev/$boot /mnt
-# tpm_gen_dmcrypt_key /mnt/encrypted_passphrase /tmp/passphrase
-# umount /mnt
-
-Note:
-The plain passphrase is sensitive information, so it is unsafe to save
-it to a disk-backed location. Make sure /tmp is mounted with RAM-based
-filesystem such as tpmfs.
-
-- [Non-TPM] Create the plain passphrase file
-# dd if=/dev/urandom of=/mnt/passphrase bs=1 count=32
-# cp -f /mnt/passphrase /tmp/passphrase
-
-Note:
-This instruction will place an insecure passphrase on $boot. So please
-ensure you know what your risk is to use them in your product.
-Alternately, omit this step and always type the passphrase whenever
-attempting to mount the encrypted rootfs.
-
-- [TPM] Create the LUKS partition
-# cryptsetup --type luks --cipher aes-xts-plain64 --hash sha512 \
-      --use-random --key-file /tmp/passphrase luksFormat /dev/$rootfs
-
-- [Non-TPM] Create the LUKS partition
-# cryptsetup --type luks --cipher aes-xts-plain64 --hash sha512 \
-      --use-random --key-file - luksFormat /dev/$rootfs
-
-The end user will be prompted to input the passphrase, or use the
-insecure plain passphrase.
-# cryptsetup --type luks --cipher aes-xts-plain64 --hash sha512 \
-      --use-random --key-file /tmp/passphrase luksFormat /dev/$rootfs
-
-- Open the LUKS partition
-# cryptsetup luksOpen --key-file /tmp/passphrase /dev/$rootfs $name
-
-- Remove the plain passphrase file
-# rm -f /tmp/passphrase
-
-- Create the filesystem/volume on the LUKS partition
-The user can run any available filesytem formatting program on
-/dev/mapper/$name to create the filesytem/volume with the data encryption.
-
-# mount /dev/mapper/$name /mnt
-
-The rootfs tarball can be extracted to this filesytem/volume for next boot,
-and the kernel and bootloader are placed to $boot.
-
-- Close the LUKS partition
-# umount /mnt
-# cryptsetup luksClose $name
-
-- Backup the persistent storage file for the use in initramfs
-# mount /dev/$boot /mnt
-# cp /var/lib/tpm/system.data /mnt
-
-- Create the new boot entry in grub.cfg, e.g, for the case of using the
-default project configuration with this template:
-# cat > /mnt/EFI/BOOT/grub.cfg << END_OF_GRUB_CFG
-menuentry 'Wind River Linux with LUKS' {
-    linux /bzImage-initramfs root=/dev/$rootfs rw rootwait
-}
-END_OF_GRUB_CFG
-or
-# cat > /mnt/EFI/BOOT/grub.cfg << END_OF_GRUB_CFG
-menuentry 'Wind River Linux with LUKS' {
-    chainloader /bzImage-initramfs root=/dev/$rootfs rw rootwait
-}
-END_OF_GRUB_CFG
-if feature/uefi-secure-boot or feature/mok-secure-boot configured.
-# umount /mnt
-
-- Reboot system
-
-- Detach the USB drive
-
-- Boot into initramfs
-The system will automatically boot into the initramfs after the reboot as long
-as a correct grub boot entry is created as above mentioned. 
-
-Note: The next section is informative only. The init script in initramfs
-will automatically run the following procedure without the necessity of
-user interaction, unless prompting the user to type a passphrase if the
-encrypted passphrase file is incorrect or not present.
-
-Mount Encrypted Rootfs
-~~~~~~~~~~~~~~~~~~~~~~
-- [TPM] Get the encrypted passphrase file and the persistent storage file
-# mount /dev/$boot /mnt
-# mkdir -p /var/lib/tpm
-# cp /mnt/system.data /var/lib/tpm
-# cp /mnt/encrypted_passphrase /tmp
-# umount /mnt
-
-- [TPM] Set up TPM
-# mknod /dev/tpm c 10 224
-# modprobe tpm_tis
-# export TSS_TCSD_HOSTNAME=127.0.0.1
-# ifconfig lo up
-# tcsd
-
-- [TPM] Unwrap the encrypted passphrase file
-# tpm_unwrap_dmcrypt_key /tmp/encrypted_passphrase /tmp/passphrase
-
-Note:
-The plain passphrase is sensitive information, so it is unsafe to save
-it to a disk-backed location. Make sure /tmp is mounted with RAM-based
-filesystem such as tpmfs.
-
-- [TPM] Open the LUKS partition
-# cryptsetup luksOpen --key-file /tmp/passphrase /dev/$rootfs $name
-
-- [Non-TPM] Open the LUKS partition
-# cryptsetup luksOpen --key-file - /dev/$rootfs $name
-The end user will be prompted to input the passphrase.
-
-- Remove the plain passphrase file
-# rm -f /tmp/passphrase
-
-- Copy the persistent storage file to the real rootfs
-# mount /dev/mapper/$name /mnt
-# cp -f /var/lib/tpm/system.data /mnt/var/lib/tpm
-
-- Switch to the real rootfs
-# switch_root /mnt /sbin/init
-
-Use case 2: initramfs
----------------------
-initramfs employs a init script to automatically unseal the passphrase
-without any interaction.
+- Reboot
+After reboot to initramfs, it employs a init script to transparently
+unseal the passphrase and mount the rootfs without any interaction.
