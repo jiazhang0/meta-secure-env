@@ -113,7 +113,7 @@ Refer to feature/tpm2/README for the details.
 - Install overc runtime on the hard drive
 Refer to layers/meta-overc/README.install for the details about how to
 run cubeit-installer to install overc runtime to a hard drive. In
-addition, beware of specifying "--encryption" option to set up an
+addition, beware of specifying "--encrypt" option to set up an
 encrypted rootfs.
 
 - Reboot
