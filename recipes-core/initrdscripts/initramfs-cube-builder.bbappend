@@ -5,7 +5,9 @@ SRC_URI += "\
 "
 
 do_install_append() {
-    install -m 0755 ${WORKDIR}/init.cryptfs ${D}
+    if [ x"${STORAGE_ENCRYPTION}" = x"1" ]; then
+        install -m 0755 ${WORKDIR}/init.cryptfs ${D}
+    fi
 }
 
 FILES_${PN} += "/init.cryptfs"
