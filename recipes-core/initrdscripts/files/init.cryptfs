@@ -41,6 +41,7 @@ LUKS_NAME="${4:-cryptfs}"
 TPM_TIS_MODULE_LOADED=0
 TPM_CRB_MODULE_LOADED=0
 TPM_DEVICE=""
+TMP_DIR_MOUNTED=0
 
 function print_critical
 {
@@ -311,7 +312,7 @@ function trap_handler
 
     rm -f "$TMP_DIR/$PASSPHRASE" 2>/dev/null
 
-    pkill -9 resourcemgr
+    pkill -9 resourcemgr 2>/dev/null
     [ $TPM_TIS_MODULE_LOADED -eq 1 ] && modprobe --quiet -r tpm_tis
     [ $TPM_CRB_MODULE_LOADED -eq 1 ] && modprobe --quiet -r tpm_crb    
     [ ! -z "$TPM_DEVICE" ] && rm -f "$TPM_DEVICE" 2>/dev/null
@@ -348,7 +349,6 @@ if ! create_dir "$TMP_DIR"; then
     exit 1
 fi
 
-TMP_DIR_MOUNTED=0
 if ! grep -q "$TMP_DIR" /proc/mounts; then
    ! mount -t tmpfs none "$TMP_DIR" 2>/dev/null &&
        print_error "Unable to mount tmpfs filesystem" && exit 1
