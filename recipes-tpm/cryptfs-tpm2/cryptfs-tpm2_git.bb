@@ -1,12 +1,12 @@
-SUMMARY = "This project provides with an implementation \
-for storing/restoring a passphrase with TPM 2.0"
+SUMMARY = "A tool used to create, persist, evict a passphrase \
+for full-disk-encryption with TPM 2.0"
 DESCRIPTION = " \
 This project provides with an implementation for \
-storing/restoring a passphrase with TPM 2.0. The passphrase \
-and its associated primary key are automatically created by \
-RNG engine in TPM. In order to avoid saving the context file, \
-the created passphrase and primary key are always persistent \
-in TPM. \
+creating, persisting and evicting a passphrase with TPM 2.0. \
+The passphrase and its associated primary key are automatically \
+created by RNG engine in TPM. In order to avoid saving the \
+context file, the created passphrase and primary key are always \
+persistent in TPM. \
 "
 SECTION = "devel"
 LICENSE = "BSD"
@@ -15,8 +15,8 @@ LIC_FILES_CHKSUM = "file://${S}/LICENSE;md5=af9aa760caa1532b4f5c9874d4e8c753"
 SRC_URI = " \
     git://github.com/WindRiver-OpenSourceLabs/cryptfs-tpm2.git \
 "
-SRCREV = "0bc9df8562ee195c5735a9afef10390d0a00a88f"
-PV = "0.3.0+git${SRCPV}"
+SRCREV = "f518e1d3d6c82fb7ef9fe5f32bc13871833007a7"
+PV = "0.4.0+git${SRCPV}"
 
 DEPENDS += "tpm2.0-tss"
 RDEPENDS_${PN} += "libtss2 libtctisocket"
