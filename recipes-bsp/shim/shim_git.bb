@@ -30,7 +30,7 @@ SRC_URI = " \
         file://Fix-the-world-build-failure-due-to-the-missing-rule-.patch \
         file://Don-t-enforce-to-use-gnu89-standard.patch \
 "
-SRCREV = "d3884fe8336be793e3b3ad5813f5e6c436d78d60"
+SRCREV = "431d893b41c53f6a022031ca0cc66fd298e0e472"
 PV = "0.9+git${SRCPV}"
 
 COMPATIBLE_HOST = '(i.86|x86_64).*-linux'
