@@ -304,7 +304,6 @@ function trap_handler
     if [ $err -ne 0 ]; then
         if [ -d "$ROOTFS_DIR" ]; then
             umount "$ROOTFS_DIR" 2>/dev/null
-            rmdir --ignore-fail-on-non-empty "$ROOTFS_DIR" 2>/dev/null
         fi
 
         cryptsetup luksClose "$LUKS_NAME" 2>/dev/null
