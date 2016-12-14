@@ -332,9 +332,23 @@ luks_rawdev_pathes="$(blkid -o list | grep crypto_LUKS | awk '{ print $1 }')"
 
 ! parse_rootfs_dev_path rootfs_dev_path_type rootfs_dev_path_name && exit 1
 
+get_rawdev $rootfs_dev_path_type $rootfs_dev_path_name rootfs_rawdev
+if [ $? -eq 0 ]; then
+    # Check whether the rootfs device is a LUKS partition.
+    err=1
+    for luks_rawdev in $luks_rawdev_pathes; do
+        [ "$rootfs_rawdev" = "$luks_rawdev" ] && err=0 && break
+    done
+
+    if [ $err -eq 1 ]; then
+        print_info "The specified rootfs is not a LUKS partition"
+        exit 1
+    fi
+fi
+
 # root=LABEL=xxx cannot be parsed until the LUKS partition is mounted.
-! get_rawdev $rootfs_dev_path_type $rootfs_dev_path_name rootfs_rawdev &&
-    [ "$rootfs_dev_path_type" != "LABEL" ] && exit 1
+[ "$rootfs_dev_path_type" != "LABEL" ] &&
+    print_error "Unable to locate the specified rootfs" && exit 1
 
 # Overwrite LUKS_NAME if root=LABEL=xxx is specified.
 [ "$rootfs_dev_path_type" = "LABEL" ] && [ -n "$rootfs_dev_path_name" ] &&
