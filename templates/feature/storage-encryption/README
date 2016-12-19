@@ -66,8 +66,30 @@ Note: if TPM is detected, the passphrase will be generated automatically.
 
 For more uses about luks-setup.sh, run it with -h option.
 
-Next refer to "Create the filesystem/volume on the LUKS partition" to manually
-create the filesystem/volume.
+To access the encryped partition created with luks-setup.sh, run the following
+steps.
+
+- Retrieve the passphrase
+# cryptfs-tpm2 -q unseal passphrase -P sha1 -o /tmp/passphrase
+
+This command will unseal the passphrase from TPM device and save the content
+of passphrase to the file /tmp/passphrase.
+
+- Open the LUKS partition
+# cryptsetup luksOpen --key-file /tmp/passphrase /dev/$dev $name
+
+- Mount the LUKS partition
+# mount /dev/mapper/$name $mount_point
+
+The remaining operations are left to the user. Don't forget to close the LUKS
+partition if not used.
+
+Note:
+- If TPM device exists in the system, the passphrase will be bound to PCR 7,
+gating the unseal operation. If the value of PCR 7 when unsealing the
+passphrase doesn't match up the value when creating the passphrase, the
+passphrase cannot be unsealed. The value of PCR 7 is usually affected by the
+status of UEFI secure boot. Contact the BIOS manufacture for the more details.
 
 Root Filesystem Encryption
 ==========================
