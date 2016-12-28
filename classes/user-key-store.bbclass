@@ -9,6 +9,20 @@ def vprint(str, d):
     if d.getVar('USER_KEY_SHOW_VERBOSE', True) == '1':
         print(str)
 
+def uks_signing_model(d):
+    if d.getVar('USE_USER_KEY', True) == '1':
+        return "user"
+    else:
+        return "sample"
+
+def uks_ima_keys_dir(d):
+    # Unlike MOK/UEFI secure boot, it is not recommended to install the
+    # private key to rootfs, except using sample key.
+    if uks_signing_model(d) != "sample":
+        return None
+
+    return d.getVar('IMA_KEYS_DIR', True) + '/'
+
 def sign_efi_image(key, cert, input, output, d):
     import bb.process
 
@@ -266,8 +280,10 @@ python do_check_user_keys_class-target () {
     vprint('  USE_USER_KEY: ${USE_USER_KEY}', d)
     vprint('  MOK_KEYS_DIR: ${MOK_KEYS_DIR}', d)
     vprint('  UEFI_KEYS_DIR: ${UEFI_KEYS_DIR}', d)
+    vprint('  IMA_KEYS_DIR: ${IMA_KEYS_DIR}', d)
     vprint('  SAMPLE_MOK_KEYS_DIR: ${SAMPLE_MOK_KEYS_DIR}', d)
     vprint('  SAMPLE_UEFI_KEYS_DIR: ${SAMPLE_UEFI_KEYS_DIR}', d)
+    vprint('  SAMPLE_IMA_KEYS_DIR: ${SAMPLE_IMA_KEYS_DIR}', d)
 
     for _ in ('UEFI', 'MOK'):
         # Intend to use user key?
