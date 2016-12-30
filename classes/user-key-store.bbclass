@@ -9,6 +9,20 @@ def vprint(str, d):
     if d.getVar('USER_KEY_SHOW_VERBOSE', True) == '1':
         print(str)
 
+def uks_signing_model(d):
+    if d.getVar('USE_USER_KEY', True) == '1':
+        return "user"
+    else:
+        return "sample"
+
+def uks_ima_keys_dir(d):
+    # Unlike MOK/UEFI secure boot, it is not recommended to install the
+    # private key to rootfs, except using sample key.
+    if uks_signing_model(d) != "sample":
+        return None
+
+    return d.getVar('IMA_KEYS_DIR', True) + '/'
+
 def sign_efi_image(key, cert, input, output, d):
     import bb.process
 
@@ -22,10 +36,10 @@ def sign_efi_image(key, cert, input, output, d):
         raise bb.build.FuncFailed('ERROR: Unable to sign %s' % input)
 
 def uefi_sb_keys_dir(d):
-    set_keys_dir('UEFI', d)
-    return d.getVar('UEFI_KEYS_DIR', True) + '/'
+    set_keys_dir('UEFI_SB', d)
+    return d.getVar('UEFI_SB_KEYS_DIR', True) + '/'
 
-def check_uefi_user_keys(d):
+def check_uefi_sb_user_keys(d):
     dir = uefi_sb_keys_dir(d)
 
     for _ in ('PK', 'KEK', 'DB'):
@@ -48,8 +62,8 @@ def mok_sb_keys_dir(d):
     if d.getVar('MOK_SB', True) != '1':
         return
 
-    set_keys_dir('MOK', d)
-    return d.getVar('MOK_KEYS_DIR', True) + '/'
+    set_keys_dir('MOK_SB', d)
+    return d.getVar('MOK_SB_KEYS_DIR', True) + '/'
 
 def sb_sign(input, output, d):
     if d.getVar('MOK_SB', True) == '1':
@@ -57,7 +71,7 @@ def sb_sign(input, output, d):
     elif d.getVar('UEFI_SB', True) == '1':
         uefi_sb_sign(input, output, d)
 
-def check_mok_user_keys(d):
+def check_mok_sb_user_keys(d):
     dir = mok_sb_keys_dir(d)
 
     for _ in ('shim_cert', 'vendor_cert'):
@@ -94,10 +108,10 @@ __pem2esl() {
 
 # Blacklist the sample DB, shim_cert, vendor_cert by default.
 __create_default_mok_sb_blacklist() {
-    __pem2esl "${SAMPLE_MOK_KEYS_DIR}/shim_cert.pem" \
+    __pem2esl "${SAMPLE_MOK_SB_KEYS_DIR}/shim_cert.pem" \
         "${TMPDIR}/sample_shim_cert.esl"
 
-    __pem2esl "${SAMPLE_MOK_KEYS_DIR}/vendor_cert.pem" \
+    __pem2esl "${SAMPLE_MOK_SB_KEYS_DIR}/vendor_cert.pem" \
         "${TMPDIR}/sample_vendor_cert.esl"
 
     # Cascade the sample DB, shim_cert and vendor_cert to
@@ -107,7 +121,7 @@ __create_default_mok_sb_blacklist() {
 }
 
 __create_default_uefi_sb_blacklist() {
-    __pem2esl "${SAMPLE_UEFI_KEYS_DIR}/DB.pem" \
+    __pem2esl "${SAMPLE_UEFI_SB_KEYS_DIR}/DB.pem" \
         "${TMPDIR}/sample_DB.esl"
 
     cat "${TMPDIR}/sample_DB.esl" > "${TMPDIR}/blacklist.esl"
@@ -228,35 +242,38 @@ create_mok_user_keys() {
         -keyout "$deploy_dir/vendor_cert.key" -out "$deploy_dir/vendor_cert.pem" \
 }
 
-def create_user_keys(sb, d):
-    vprint('Creating the user keys for %s Secure Boot ...' % sb, d)
-    bb.build.exec_func('create_' + sb.lower() + '_user_keys', d)
+def create_user_keys(name, d):
+    vprint('Creating the user keys for %s ...' % name, d)
+    bb.build.exec_func('create_' + name.lower() + '_user_keys', d)
 
-def sanity_check_user_keys(sb, may_exit, d):
-    vprint('Checking the user keys for %s Secure Boot ...' % sb, d)
+def sanity_check_user_keys(name, may_exit, d):
+    vprint('Checking the user keys for %s ...' % name, d)
 
-    if sb == 'UEFI':
-        _ = check_uefi_user_keys(d)
+    if name == 'UEFI_SB':
+        _ = check_uefi_sb_user_keys(d)
+    elif name == 'MOK_SB':
+        _ = check_mok_sb_user_keys(d)
     else:
-        _ = check_mok_user_keys(d)
+        _ = False
+        may_exit = True
 
     if _ == False:
         if may_exit:
-            raise bb.build.FuncFailed('ERROR: Unable to find %s user key ...' % sb)
+            raise bb.build.FuncFailed('ERROR: Unable to find user key for %s ...' % name)
 
-        vprint('Failed to check the user keys for %s Secure Boot ...' % sb, d)
+        vprint('Failed to check the user keys for %s ...' % name, d)
     else:
-        vprint('Found the user keys for %s Secure Boot ...' % sb, d)
+        vprint('Found the user keys for %s ...' % name, d)
 
     return _
 
-# MOK|UEFI_KEYS_DIR need to be updated whenever reading them.
-def set_keys_dir(sb, d):
-    if (d.getVar(sb + '_SB', True) != "1") or (d.getVar('USE_USER_KEY', True) != "1"):
+# *_KEYS_DIR need to be updated whenever reading them.
+def set_keys_dir(name, d):
+    if (d.getVar(name, True) != "1") or (d.getVar('USE_USER_KEY', True) != "1"):
         return
 
-    if d.getVar(sb + '_KEYS_DIR', True) == d.getVar('SAMPLE_' + sb + '_KEYS_DIR', True):
-        d.setVar(sb + '_KEYS_DIR', d.getVar('DEPLOY_DIR_IMAGE', True) + '/user-keys/' + sb.lower() + '_sb_keys')
+    if d.getVar(name + '_KEYS_DIR', True) == d.getVar('SAMPLE_' + name + '_KEYS_DIR', True):
+        d.setVar(name + '_KEYS_DIR', d.getVar('DEPLOY_DIR_IMAGE', True) + '/user-keys/' + name.lower() + '_keys')
 
 # Check and/or generate the user keys
 python do_check_user_keys_class-target () {
@@ -264,14 +281,16 @@ python do_check_user_keys_class-target () {
     vprint('  MOK_SB: ${MOK_SB}', d)
     vprint('  UEFI_SB: ${UEFI_SB}', d)
     vprint('  USE_USER_KEY: ${USE_USER_KEY}', d)
-    vprint('  MOK_KEYS_DIR: ${MOK_KEYS_DIR}', d)
-    vprint('  UEFI_KEYS_DIR: ${UEFI_KEYS_DIR}', d)
-    vprint('  SAMPLE_MOK_KEYS_DIR: ${SAMPLE_MOK_KEYS_DIR}', d)
-    vprint('  SAMPLE_UEFI_KEYS_DIR: ${SAMPLE_UEFI_KEYS_DIR}', d)
+    vprint('  MOK_SB_KEYS_DIR: ${MOK_SB_KEYS_DIR}', d)
+    vprint('  UEFI_SB_KEYS_DIR: ${UEFI_SB_KEYS_DIR}', d)
+    vprint('  IMA_KEYS_DIR: ${IMA_KEYS_DIR}', d)
+    vprint('  SAMPLE_MOK_SB_KEYS_DIR: ${SAMPLE_MOK_SB_KEYS_DIR}', d)
+    vprint('  SAMPLE_UEFI_SB_KEYS_DIR: ${SAMPLE_UEFI_SB_KEYS_DIR}', d)
+    vprint('  SAMPLE_IMA_KEYS_DIR: ${SAMPLE_IMA_KEYS_DIR}', d)
 
-    for _ in ('UEFI', 'MOK'):
+    for _ in ('UEFI_SB', 'MOK_SB'):
         # Intend to use user key?
-        if (d.getVar(_ + '_SB', True) != "1") or ("${USE_USER_KEY}" != "1"):
+        if (d.getVar(_, True) != "1") or ("${USE_USER_KEY}" != "1"):
             continue
 
         # Check if the generation for user key is required. If so,
@@ -287,8 +306,8 @@ python do_check_user_keys_class-target () {
             sanity_check_user_keys(_, True, d)
 
     vprint('Results after do_check_user_keys():', d)
-    vprint('  MOK_KEYS_DIR: %s' % d.getVar('MOK_KEYS_DIR', True), d)
-    vprint('  UEFI_KEYS_DIR: %s' % d.getVar('UEFI_KEYS_DIR', True), d)
+    vprint('  MOK_SB_KEYS_DIR: %s' % d.getVar('MOK_SB_KEYS_DIR', True), d)
+    vprint('  UEFI_SB_KEYS_DIR: %s' % d.getVar('UEFI_SB_KEYS_DIR', True), d)
 }
 
 python do_check_user_keys () {

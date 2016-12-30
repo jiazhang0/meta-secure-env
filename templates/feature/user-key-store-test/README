@@ -18,11 +18,11 @@ The vital definitions include:
 - USE_USER_KEY = "1"
   Prohibit using the sample keys for signing the images.
 
-- UEFI_KEYS_DIR := "<path>"
+- UEFI_SB_KEYS_DIR := "<path>"
   Point to the location of user keys used for UEFI Secure Boot. If not defined,
   the user keys for UEFI Secure Boot will be generated.
 
-- MOK_KEYS_DIR := "<path>"
+- MOK_SB_KEYS_DIR := "<path>"
   Point to the location of user keys used for Mok Secure Boot. Note that
   Mok Secure Boot is on top of UEFI Secure Boot so creating the user keys
   for Mok Secure Boot only will still introduce the security risk in your
