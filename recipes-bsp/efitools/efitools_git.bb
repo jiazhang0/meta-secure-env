@@ -53,13 +53,11 @@ addtask prepare_signing_keys after do_configure before do_compile
 # However, this DBX.esl embedded in LockDown.efi doesn't have the
 # expected contents. We have to rebuild LockDown.efi.
 do_compile_append() {
-    if [ x"${UEFI_SB}" != x"1" -o x"${USE_USER_KEY}" != x"1" ]; then
-        return
+    if [ x"${UEFI_SB}" = x"1" -a x"${USE_USER_KEY}" = x"1" ]; then
+        cp -f "${TMPDIR}/blacklist.esl" DBX.esl
+        rm -f LockDown.efi LockDown.so LockDown.o DBX.h DBX.auth
+        oe_runmake LockDown.efi
     fi
-    
-    cp -f "${TMPDIR}/blacklist.esl" DBX.esl
-    rm -f LockDown.efi LockDown.so LockDown.o DBX.h DBX.auth
-    oe_runmake LockDown.efi
 }
 
 do_install_append() {
