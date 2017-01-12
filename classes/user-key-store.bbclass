@@ -62,16 +62,23 @@ def mok_sb_keys_dir(d):
     return d.getVar('MOK_SB_KEYS_DIR', True) + '/'
 
 def sb_sign(input, output, d):
+    if d.getVar('UEFI_SB', True) == '1':
+        if uks_signing_model(d) == 'sample' or uks_signing_model(d) == 'user':
+            # deal with MOK_SB firstly, as MOK_SB means MOK_SB | UEFI_SB
+            # On this scenario, bootloader is verified by shim_cert.pem
+            if d.getVar('MOK_SB', True) == '1':
+                mok_sb_sign(input, output, d)
+            # UEFI_SB is defined, but MOK_SB is not defined
+            # On this scenario, shim is not used, and DB.pem is used to
+            # verify bootloader directly.
+            else:
+                uefi_sb_sign(input, output, d)
+        elif uks_signing_model(d) == 'edss':
+            edss_sign_efi_image(input, output, d)
+
+def shim_sb_sign(input, output, d):
     if uks_signing_model(d) == 'sample' or uks_signing_model(d) == 'user':
-        # deal with MOK_SB firstly, as MOK_SB means MOK_SB | UEFI_SB
-        # On this scenario, bootloader is verified by shim_cert.pem
-        if d.getVar('MOK_SB', True) == '1':
-            mok_sb_sign(input, output, d)
-        # UEFI_SB is defined, but MOK_SB is not defined
-        # On this scenario, shim is not used, and DB.pem is used to
-        # verify bootloader directly.
-        elif d.getVar('UEFI_SB', True) == '1':
-            uefi_sb_sign(input, output, d)
+        uefi_sb_sign(input, output, d)
     elif uks_signing_model(d) == 'edss':
         edss_sign_efi_image(input, output, d)
 
@@ -91,6 +98,24 @@ def mok_sb_sign(input, output, d):
     if d.getVar('MOK_SB', True) == '1':
         _ = mok_sb_keys_dir(d)
         sign_efi_image(_ + 'shim_cert.key', _ + 'shim_cert.pem', input, output, d)
+
+# Prepare signing keys for shim
+def shim_prepare_sb_keys(d):
+    # For UEFI_SB, shim is not built
+    if d.getVar('MOK_SB', True) != '1':
+        return
+
+    create_mok_vendor_dbx(d)
+    # Prepare shim_cert and vendor_cert.
+    dir = mok_sb_keys_dir(d)
+    import shutil
+    shutil.copyfile(dir + 'shim_cert.pem', d.getVar('S', True) + '/shim.crt')
+    pem2der(dir + 'vendor_cert.pem', d.getVar('WORKDIR', True) + '/vendor_cert.cer', d)
+    d.appendVar('EXTRA_OEMAKE', ' VENDOR_CERT_FILE="${WORKDIR}/vendor_cert.cer"')
+
+    # add blacklist for user
+    if uks_signing_model(d) == 'user':
+       d.appendVar('EXTRA_OEMAKE', ' VENDOR_DBX_FILE="${WORKDIR}/vendor_dbx.esl"')
 
 def check_ima_user_keys(d):
     dir = uks_ima_keys_dir(d)

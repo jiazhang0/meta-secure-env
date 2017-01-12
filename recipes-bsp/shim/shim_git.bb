@@ -29,6 +29,7 @@ SRC_URI = " \
         file://Use-sbsign-to-sign-MokManager-and-fallback.patch \
         file://Fix-the-world-build-failure-due-to-the-missing-rule-.patch \
         file://Don-t-enforce-to-use-gnu89-standard.patch \
+	file://Makefile-do-not-sign-the-efi-file.patch \
 "
 SRCREV = "431d893b41c53f6a022031ca0cc66fd298e0e472"
 PV = "0.9+git${SRCPV}"
@@ -62,14 +63,6 @@ EXTRA_OEMAKE = " \
 	AR=${AR} \
 "
 
-python () {
-    if d.getVar('MOK_SB', True) == "1":
-        d.appendVar('EXTRA_OEMAKE', ' VENDOR_CERT_FILE="${WORKDIR}/vendor_cert.cer"')
-
-    if d.getVar('USE_USER_KEY', True) == "1":
-        d.appendVar('EXTRA_OEMAKE', ' VENDOR_DBX_FILE="${WORKDIR}/vendor_dbx.esl"')
-}
-
 PARALLEL_MAKE = ""
 
 EFI_TARGET = "/boot/efi/EFI/BOOT"
@@ -77,38 +70,14 @@ FILES_${PN} += "${EFI_TARGET}"
 
 # Prepare the signing certificate and keys
 python do_prepare_signing_keys() {
-    if '${MOK_SB}' != '1':
-        return
-
-    # Prepare vendor_dbx.
-    create_mok_vendor_dbx(d)
-
-    import shutil
-
-    # Prepare shim_cert and vendor_cert.
-    dir = mok_sb_keys_dir(d)
-    shutil.copyfile(dir + 'shim_cert.pem', '${S}/shim.crt')
-    shutil.copyfile(dir + 'shim_cert.key', '${S}/shim.key')
-    pem2der(dir + 'vendor_cert.pem', '${WORKDIR}/vendor_cert.cer', d)
-
-    import bb.process
-
-    # PKCS12 formatted private key with empty exporting cipher, and just used
-    # by pesign. Same fuction as shim_cert.
-    cmd = (' '.join(('${STAGING_BINDIR_NATIVE}/openssl', 'pkcs12',
-           '-in', dir + 'shim_cert.pem',
-           '-inkey', dir + 'shim_cert.key',
-           '-export', '-passout', 'pass:""',
-           '-out', '${S}/shim.p12')))
-    try:
-        result, _ = bb.process.run(cmd)
-    except:
-        raise bb.build.FuncFailed('ERROR: Unable to create shim.p12')
+    shim_prepare_sb_keys(d)
 }
 addtask prepare_signing_keys after do_configure before do_compile
 
 python do_sign() {
-    uefi_sb_sign('${S}/shim${EFI_ARCH}.efi', '${B}/shim${EFI_ARCH}.efi.signed', d)
+    shim_sb_sign('${S}/shim${EFI_ARCH}.efi', '${B}/shim${EFI_ARCH}.efi.signed', d)
+    shim_sb_sign('${S}/mm${EFI_ARCH}.efi', '${B}/mm${EFI_ARCH}.efi.signed', d)
+    shim_sb_sign('${S}/fb${EFI_ARCH}.efi', '${B}/fb${EFI_ARCH}.efi.signed', d)
 }
 addtask sign after do_compile before do_install
 
