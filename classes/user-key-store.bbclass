@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2016 Wind River Systems, Inc.
+# Copyright (C) 2016-2017 Wind River Systems, Inc.
 #
 
 DEPENDS_append_class-target = " sbsigntool-native"
@@ -16,11 +16,6 @@ def uks_signing_model(d):
         return "sample"
 
 def uks_ima_keys_dir(d):
-    # Unlike MOK/UEFI secure boot, it is not recommended to install the
-    # private key to rootfs, except using sample key.
-    if uks_signing_model(d) != "sample":
-        return None
-
     return d.getVar('IMA_KEYS_DIR', True) + '/'
 
 def sign_efi_image(key, cert, input, output, d):
@@ -87,6 +82,14 @@ def mok_sb_sign(input, output, d):
     if d.getVar('MOK_SB', True) == '1':
         _ = mok_sb_keys_dir(d)
         sign_efi_image(_ + 'shim_cert.key', _ + 'shim_cert.pem', input, output, d)
+
+def check_ima_user_keyss(d):
+    dir = uks_ima_keys_dir(d)
+
+    for _ in ('ima_pubkey', 'ima_privkey'):
+        if not os.path.exists(dir + _ + '.pem'):
+            vprint("%s.pem is unavailable" % _, d)
+            return False
 
 # Convert the PEM to DER format.
 def pem2der(input, output, d):
@@ -242,6 +245,17 @@ create_mok_user_keys() {
         -keyout "$deploy_dir/vendor_cert.key" -out "$deploy_dir/vendor_cert.pem" \
 }
 
+create_ima_user_keys() {
+    local deploy_dir="${DEPLOY_DIR_IMAGE}/user-keys/ima_keys"
+
+    install -d "$deploy_dir"
+
+    "${STAGING_BINDIR_NATIVE}/openssl" genrsa -out "$deploy_dir/ima_privkey.pem" 2048
+
+    "${STAGING_BINDIR_NATIVE}/openssl" rsa -in "$deploy_dir/ima_privkey.pem" -pubout \
+        -out "$deploy_dir/ima_pubkey.pem"
+}
+
 def create_user_keys(name, d):
     vprint('Creating the user keys for %s ...' % name, d)
     bb.build.exec_func('create_' + name.lower() + '_user_keys', d)
@@ -253,6 +267,8 @@ def sanity_check_user_keys(name, may_exit, d):
         _ = check_uefi_sb_user_keys(d)
     elif name == 'MOK_SB':
         _ = check_mok_sb_user_keys(d)
+    elif name == 'IMA':
+        _ = check_ima_user_keys(d)
     else:
         _ = False
         may_exit = True
@@ -288,7 +304,7 @@ python do_check_user_keys_class-target () {
     vprint('  SAMPLE_UEFI_SB_KEYS_DIR: ${SAMPLE_UEFI_SB_KEYS_DIR}', d)
     vprint('  SAMPLE_IMA_KEYS_DIR: ${SAMPLE_IMA_KEYS_DIR}', d)
 
-    for _ in ('UEFI_SB', 'MOK_SB'):
+    for _ in ('UEFI_SB', 'MOK_SB', 'IMA'):
         # Intend to use user key?
         if (d.getVar(_, True) != "1") or ("${USE_USER_KEY}" != "1"):
             continue
@@ -302,12 +318,13 @@ python do_check_user_keys_class-target () {
                 create_user_keys(_, d)
         else:
             # Raise error if not specifying the location of the
-            # user keys for mok/uefi secure boot.
+            # user keys.
             sanity_check_user_keys(_, True, d)
 
     vprint('Results after do_check_user_keys():', d)
     vprint('  MOK_SB_KEYS_DIR: %s' % d.getVar('MOK_SB_KEYS_DIR', True), d)
     vprint('  UEFI_SB_KEYS_DIR: %s' % d.getVar('UEFI_SB_KEYS_DIR', True), d)
+    vprint('  IMA_KEYS_DIR: %s' % d.getVar('IMA_KEYS_DIR', True), d)
 }
 
 python do_check_user_keys () {
