@@ -59,6 +59,10 @@ do_install_append_class-target() {
         sed -i '/^\s*initrd /d' $cfg
     fi
 
+    # Enable integrity audit log and the default IMA rules if IMA is enabled.
+    [ x"${IMA}" = x"1" ] &&
+        sed -i 's/^\s*chainloader .*rootwait.*/& integrity_audit=1 ima_policy=tcb/' $cfg
+
     # Create a boot entry for Automatic Key Provision. This is required because
     # certain hardware, e.g, Intel NUC5i3MYHE, doedn't support to display a
     # customized BIOS boot option used to launch LockDown.efi.
