@@ -20,7 +20,7 @@ The vital definitions include:
 
 - UEFI_SB_KEYS_DIR := "<path>"
   Point to the location of user keys used for UEFI Secure Boot. If not defined,
-  the user keys for UEFI Secure Boot will be generated.
+  the user keys for UEFI Secure Boot will be automatically generated.
 
 - MOK_SB_KEYS_DIR := "<path>"
   Point to the location of user keys used for Mok Secure Boot. Note that
@@ -28,6 +28,10 @@ The vital definitions include:
   for Mok Secure Boot only will still introduce the security risk in your
   product. If not defined, the user keys for Mok Secure Boot will be
   generated.
+
+- IMA_KEYS_DIR := "<path>"
+  Point to the location of user keys used for IMA appraise. If not defined,
+  the user keys for IMA appraise will be automatically generated.
 
 - USER_KEY_SHOW_VERBOSE = "1"
   Optional. Used to enable the verbose output for debug purpose.
