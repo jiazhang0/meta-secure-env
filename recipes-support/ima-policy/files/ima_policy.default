@@ -1,0 +1,23 @@
+# The default external IMA policy
+
+# Don't appraise any file opened.
+dont_appraise func=FILE_CHECK
+# Reduce performance loss
+# audit func=FILE_CHECK fowner=0 mask=^MAY_READ
+# measure func=FILE_CHECK fowner=0 mask=^MAY_READ
+
+measure func=MMAP_CHECK euid=0
+appraise func=MMAP_CHECK euid=0 appraise_type=imasig
+audit func=MMAP_CHECK euid=0
+
+measure func=BPRM_CHECK euid=0
+appraise func=BPRM_CHECK euid=0 appraise_type=imasig
+audit func=BPRM_CHECK euid=0
+
+measure func=MODULE_CHECK euid=0
+appraise func=MODULE_CHECK euid=0 appraise_type=imasig
+audit func=MODULE_CHECK euid=0
+
+measure func=FIRMWARE_CHECK euid=0
+appraise func=FIRMWARE_CHECK euid=0 appraise_type=imasig
+audit func=FIRMWARE_CHECK euid=0

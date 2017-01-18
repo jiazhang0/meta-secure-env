@@ -1,0 +1,138 @@
+Overview
+========
+
+The Linux IMA subsystem introduces hooks within the Linux kernel to support
+measuring the integrity of files that are loaded (including application code)
+before it is executed or mmap()ed to memory. The measured value (hash) is then
+registered in a log that can be consulted by administrators.
+
+To support proven integrity of the files, the IMA subsystem can interact with
+the TPM chip within the system to protect the registered hashes from tampering
+by a rogue administrator or application. The IMA subsystem, as already
+supported by the Linux kernel, supports reporting on the hashes of files and
+commands ran by privileged accounts (and more if you create your own
+measurement policies).
+
+In addition, IMA appraisal can even register the measured value as an extended
+attribute, and after subsequent measurement(s) validate this extended attribute
+against the measured value and refuse to load the file (or execute the
+application) if the hash does not match. In that case, the IMA subsystem allows
+files and applications to be loaded if the hashes match (and will save the
+updated hash if the file is modified) but refuse to load it if it doesn't. This
+provides some protection against offline tampering of the files.
+
+NOTE: Extended file system attribute is required for IMA appraise, but not
+all file systems support it. Typically, the pseudo file systems, such as
+sysfs, proc, tmpfs and ramfs, certain disk-based file systems, such as FAT,
+and network file systems, such as NFS, don't support extended attributes,
+meaning IMA appraise is not available with them.
+
+Dependency
+==========
+- meta-ima
+This layer provides the user space recipes for IMA.
+
+- meta-measured
+This layer provides the kernel configurations for IMA.
+
+The default external IMA policy
+===============================
+initramfs is a good place to run some IMA initializations, such as loading
+the IMA policy, as well as the public keys used to verify IMA signatures.
+
+The default external IMA policy enforces appraising all the executable, shared
+library, kernel modules and firmwares with the digital signature in the
+effective root identity (euid=0). Hence, the opportunity of loading the default
+external IMA policy occurs at the end of initramfs initializations, just before
+switch_root.
+
+Instead of running switch_root directly from initramfs, a statically linked
+switch_root from the real rootfs is called and it must be already signed
+properly. Otherwise, switch_root will fail to mount the real rootfs and kernel
+panic will happen due to this failure.
+
+The default external IMA policy is located at /etc/ima_policy.default in
+initramfs. If a custom external IMA policy file exists, the default external
+IMA policy file won't be used any more.
+
+The default external IMA policy applies the following rules:
+- Appraise the files for exec'd (the executables), files mmap'd for exec
+  (shared libraries), kernel modules and firmwares in effective root identity
+  (euid=0).
+- Deny to run the tampered executables, shared libraries, kernel modules and
+  firmwares.
+- Deny to run any executables, shared libraries, kernel modules and firmwares
+  in the filesystems without file extended attribute supported.
+- Deny to run the newly created executables, shared libraries, kernel modules
+  and firmwares (cause iversion support is not used on mounting filesystem).
+- Allow to run the updated executables, shared libraries, kernel modules and
+  firmwares during RPM installation.
+- Note the different behaviors when executing a script.
+  e.g, launching a python script with "./test.py" is allowed only when test.py
+  is signed, and launching a python script with "python test.py" is always
+  allowed as long as the python interpreter is signed.
+
+The custom external IMA policy
+==============================
+If the default external IMA policy cannot meet the protection requirement, it
+is allowed to define the custom external IMA policy.
+
+- Deploy the custom policy file to installer image
+
+- Create /opt/installer/sbin/config-installer.sh in installer image
+  Define the IMA_POLICY variable, pointint to the path of policy file.
+
+The custom external IMA policy file is located at /etc/ima_policy.
+
+The default IMA public key & private key
+========================================
+The default IMA public key & private key are installed to
+/etc/keys/pubkey_evm.pem and /etc/keys/privkey_evm.pem.
+
+The private key come in two flavors; one used by the installer to sign all
+regular files in rootfs and one used by signing the executable, shared
+library, kernel module and firmware during RPM update. Correspondingly,
+the public key is used to verify the IMA signature signed by the private key.
+
+The custom IMA public key & private key
+=======================================
+If the end user wants to use the public key & private key owned by self, it is
+allowed to define the use them during the installation.
+
+- Deploy the ima public key and private key to /opt/installer/files/
+
+- Create /opt/installer/sbin/config-installer.sh in installer image
+  Define the IMA_PUBKEY variable, pointing to the path of public key file.
+  Define the IMA_PRIVKEY variable, pointing to the path of private key file.
+
+Best practice
+=============
+The following best practices should be applied for the product.
+
+- Enable UEFI/MOK secure boot
+  UEFI/MOK secure boot can verify the integrity of initramfs, providing the
+  protection against tampering of the IMA policy files and IMA public keys
+  stored in initramfs.
+
+- Moderate measuring
+  Measuring the files owned by non-root user may introduce malicious attack.
+  Malicious user may create lots of files with different names or trigger
+  violation conditions to exhaust the persistent kernel memory used for
+  storing event logs to the runtime measurement list.
+
+- Use IMA digital signature to protect the executable
+  Using the digital signature scheme DIGSIG is safer than digest-based scheme.
+  Meanwhile, use "appraise_type=imasig" in your IMA policy to enforce running
+  this.
+
+- Use the measurement and audit rules together
+  The runtime measurement list is unable to track down the orders of change for
+  a file, e.g, a file content varies in order of such X -> Y -> X. However,
+  audit log can record these changes in the right order.
+
+Reference
+=========
+https://sourceforge.net/p/linux-ima/wiki/Home/
+template/uefi-secure-boot/README
+template/mok-secure-boot/README
+template/user-key-store-test/README

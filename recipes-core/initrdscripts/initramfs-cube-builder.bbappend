@@ -2,15 +2,23 @@ FILESEXTRAPATHS_prepend := "${THISDIR}/files:"
 
 SRC_URI += "\
     file://init.cryptfs \
+    file://init.ima \
 "
 
 do_install_append() {
     if [ x"${STORAGE_ENCRYPTION}" = x"1" ]; then
-        install -m 0755 ${WORKDIR}/init.cryptfs ${D}
+        install -m 0500 ${WORKDIR}/init.cryptfs ${D}
+    fi
+
+    if [ x"${IMA}" = x"1" ]; then
+        install -m 0500 ${WORKDIR}/init.ima ${D}
     fi
 }
 
-FILES_${PN} += "/init.cryptfs"
+FILES_${PN} += " \
+    /init.cryptfs \
+    /init.ima \
+"
 
 # Install the minimal stuffs only, and don't care how the external
 # environment is configured.
@@ -35,7 +43,6 @@ RDEPENDS_${PN} += "\
     util-linux-blkid \
     util-linux-mount \
     util-linux-umount \
-    packagegroup-storage-encryption-initramfs \
 "
 
 RRECOMMENDS_${PN} += "kernel-module-efivarfs"
