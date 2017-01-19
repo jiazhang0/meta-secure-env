@@ -17,6 +17,4 @@ do_install() {
         "${D}${sysconfdir}"
 }
 
-CONFFILES_${PN} = "${sysconfdir}"
-
 FILES_${PN} = "${sysconfdir}"
