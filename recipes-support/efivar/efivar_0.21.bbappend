@@ -9,6 +9,7 @@ SRC_URI += "\
     file://efivar-fix-build-failure-due-to-removing-std-gnu11.patch \
     file://Multiple-fixes-for-compilation-with-gcc-6.patch \
     file://Workaround-rename-of-linux-nvme.h.patch \
+    file://Remove-use-of-deprecated-readdir_r.patch \
 "
 
 # In dp.h, 'for' loop initial declarations are used
