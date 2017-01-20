@@ -7,6 +7,7 @@ require efitools.inc
 SRC_URI_append = " \
     file://LockDown-enable-the-enrollment-for-DBX.patch \
     file://LockDown-show-the-error-message-with-3-sec-timeout.patch \
+    file://Makefile-do-not-build-signed-efi-image.patch \
 "
 
 COMPATIBLE_HOST = '(i.86|x86_64).*-linux'
