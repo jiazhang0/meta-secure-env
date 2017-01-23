@@ -36,6 +36,8 @@ In a similar manner to the case of using sample key, all related binaries
 are signed and contained in RPM and rootfs image. In addition, the resulting
 user key store is located at $build/tmp/deploy/images/<machine>/user-keys/.
 
+Refer to feature/user-key-store-test/README for more details.
+
 - TPM 2.0
 This feature enables Trusted Platform Module (TPM 2.0) support, including
 kernel option changes to enable tpm drivers, and picking up TPM 2.0 packages.
@@ -46,6 +48,21 @@ capabilities as part of the overall platform security requirements.
 
 Note: TPM 1.2 feature is added, though we don't provide the official support
 for it.
+
+Refer to feature/tpm2/README for more details.
+
+- Storage encryption
+This feature gives 2 types of granularity for storage encryption. Data volume
+encryption allows the user to create encryption partition with a passphrase
+typed by the end user. Root filesystem encryption enables the data encryption on
+the entire rootfs except the boot partition.
+
+Both types of storage encryption are based on device-mapper crypt target,
+which provides transparent encryption of block devices using the kernel crypto
+API. Additionally, the utility cryptsetup is used to conveniently setup disk
+encryption based on device-mapper crypt target.
+
+Refer to feature/storage-encryption/README for more details.
 
 Maintenance
 -----------
