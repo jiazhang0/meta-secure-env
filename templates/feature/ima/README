@@ -55,16 +55,20 @@ The default external IMA policy is located at /etc/ima_policy.default in
 initramfs. If a custom external IMA policy file exists, the default external
 IMA policy file won't be used any more.
 
-The default external IMA policy applies the following rules:
+The default external IMA policy enables the following constraint conditions:
 - Appraise the files for exec'd (the executables), files mmap'd for exec
   (shared libraries), kernel modules and firmwares in effective root identity
   (euid=0).
+- Enforce verifying the IMA signature when running the executables, shared
+  libraries, kernel modules and firmwares.
+- Deny to run the newly created executables, shared libraries, kernel modules
+  and firmwares.
 - Deny to run the tampered executables, shared libraries, kernel modules and
   firmwares.
 - Deny to run any executables, shared libraries, kernel modules and firmwares
   in the filesystems without file extended attribute supported.
-- Deny to run the newly created executables, shared libraries, kernel modules
-  and firmwares (cause iversion support is not used on mounting filesystem).
+- Allow to run the manually signed executables, shared libraries, kernel
+  modules and firmwares.
 - Allow to run the updated executables, shared libraries, kernel modules and
   firmwares during RPM installation.
 - Note the different behaviors when executing a script.
@@ -107,18 +111,23 @@ allowed to define the use them during the installation.
 
 Best practice
 =============
-The following best practices should be applied for the product.
+The following best practices should be applied with IMA.
 
 - Enable UEFI/MOK secure boot
   UEFI/MOK secure boot can verify the integrity of initramfs, providing the
-  protection against tampering of the IMA policy files and IMA public keys
-  stored in initramfs.
+  protection against tampering of the external IMA policy files and IMA public
+  keys stored in initramfs.
 
 - Moderate measuring
   Measuring the files owned by non-root user may introduce malicious attack.
   Malicious user may create lots of files with different names or trigger
-  violation conditions to exhaust the persistent kernel memory used for
-  storing event logs to the runtime measurement list.
+  violation conditions to generate a mass of event logs recorded in the runtime
+  measurement list, and thus exhaust the persistent kernel memory.
+
+- Performance influence
+  Moderate policy can make a good balance between the performance and security.
+  Tune the default external policy (/etc/ima_policy.default) and modulate the
+  custom policy for the product requirement.
 
 - Use IMA digital signature to protect the executable
   Using the digital signature scheme DIGSIG is safer than digest-based scheme.
@@ -126,13 +135,26 @@ The following best practices should be applied for the product.
   this.
 
 - Use the measurement and audit rules together
-  The runtime measurement list is unable to track down the orders of change for
-  a file, e.g, a file content varies in order of such X -> Y -> X. However,
-  audit log can record these changes in the right order.
+  The runtime measurement list is unable to track down the order of changes for
+  a file, e.g, a file content varies in order of X -> Y -> X. However, audit log
+  can record these changes in the right order.
+
+Known Issues
+============
+- The following operations may break the behavior of appraisal and cause the
+  failure of launching the executables, shared libraries, kernel modules and
+  firmwares:
+  - the syscalls used to set file last access and modification times.
+  - the syscalls used to set ownership of a file.
+  - the syscalls used to set permissions of a file.
+
+  To fix the failure, manually re-sign the affected file.
+
+  Note: RPM installation violates the IMA appraisal but its post_install
+  operation will always re-sign the affected files.
 
 Reference
 =========
 https://sourceforge.net/p/linux-ima/wiki/Home/
 template/uefi-secure-boot/README
 template/mok-secure-boot/README
-template/user-key-store-test/README
