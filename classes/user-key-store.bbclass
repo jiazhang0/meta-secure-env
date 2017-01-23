@@ -83,7 +83,7 @@ def mok_sb_sign(input, output, d):
         _ = mok_sb_keys_dir(d)
         sign_efi_image(_ + 'shim_cert.key', _ + 'shim_cert.pem', input, output, d)
 
-def check_ima_user_keyss(d):
+def check_ima_user_keys(d):
     dir = uks_ima_keys_dir(d)
 
     for _ in ('ima_pubkey', 'ima_privkey'):
