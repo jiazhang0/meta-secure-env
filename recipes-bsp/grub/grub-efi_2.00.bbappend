@@ -60,8 +60,8 @@ do_install_append_class-target() {
     fi
 
     # Enable integrity audit log and the default IMA rules if IMA is enabled.
-    [ x"${IMA}" = x"1" ] && ! grep -q "integrity_audit=1 ima_policy=tcb" $cfg &&
-        sed -i 's/^\s*chainloader .*rootwait.*/& integrity_audit=1 ima_policy=tcb/' $cfg
+    [ x"${IMA}" = x"1" ] && ! grep -q "ima_policy=tcb" $cfg &&
+        sed -i 's/^\s*chainloader .*rootwait.*/& ima_policy=tcb/' $cfg
 
     # Create a boot entry for Automatic Key Provision. This is required because
     # certain hardware, e.g, Intel NUC5i3MYHE, doedn't support to display a
