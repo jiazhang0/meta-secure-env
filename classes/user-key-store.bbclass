@@ -196,7 +196,7 @@ def create_uefi_dbx(d):
     shutil.copyfile(d.getVar('TMPDIR', True) + '/blacklist.esl', \
                     d.getVar('S', True) + '/DBX.esl')
 
-create_uefi_user_keys() { 
+create_uefi_sb_user_keys() {
     local deploy_dir="${DEPLOY_DIR_IMAGE}/user-keys/uefi_sb_keys"
 
     install -d "$deploy_dir"
@@ -231,7 +231,7 @@ create_uefi_user_keys() {
         -set_serial 1 -days 3650 -out "$deploy_dir/DB.pem"
 }
 
-create_mok_user_keys() {
+create_mok_sb_user_keys() {
     local deploy_dir="${DEPLOY_DIR_IMAGE}/user-keys/mok_sb_keys"
 
     install -d "$deploy_dir"
