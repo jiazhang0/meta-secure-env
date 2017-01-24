@@ -1,0 +1,15 @@
+[Unit]
+Description=RPM key import service
+After=local-fs.target
+Before=sysinit.target
+ConditionPathExistsGlob=/etc/pki/rpm-gpg/RPM-GPG-KEY-*
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/rpm-key-import.sh
+ExecStartPost=/bin/systemctl disable rpm-key-import
+RemainAfterExit=No
+TimeoutSec=0
+
+[Install]
+WantedBy=multi-user.target
