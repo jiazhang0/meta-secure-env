@@ -10,10 +10,7 @@ def vprint(str, d):
         print(str)
 
 def uks_signing_model(d):
-    if d.getVar('USE_USER_KEY', True) == '1':
-        return "user"
-    else:
-        return "sample"
+    return d.getVar('SIGNING_MODEL', True)
 
 def uks_ima_keys_dir(d):
     return d.getVar('IMA_KEYS_DIR', True) + '/'
@@ -29,6 +26,10 @@ def sign_efi_image(key, cert, input, output, d):
         result, _ = bb.process.run(cmd)
     except:
         raise bb.build.FuncFailed('ERROR: Unable to sign %s' % input)
+
+def edss_sign_efi_image(input, output, d):
+   # This function will be overloaded in pulsar-binary-release
+   pass
 
 def uefi_sb_keys_dir(d):
     set_keys_dir('UEFI_SB', d)
@@ -61,10 +62,25 @@ def mok_sb_keys_dir(d):
     return d.getVar('MOK_SB_KEYS_DIR', True) + '/'
 
 def sb_sign(input, output, d):
-    if d.getVar('MOK_SB', True) == '1':
-        mok_sb_sign(input, output, d)
-    elif d.getVar('UEFI_SB', True) == '1':
+    if d.getVar('UEFI_SB', True) == '1':
+        if uks_signing_model(d) == 'sample' or uks_signing_model(d) == 'user':
+            # deal with MOK_SB firstly, as MOK_SB means MOK_SB | UEFI_SB
+            # On this scenario, bootloader is verified by shim_cert.pem
+            if d.getVar('MOK_SB', True) == '1':
+                mok_sb_sign(input, output, d)
+            # UEFI_SB is defined, but MOK_SB is not defined
+            # On this scenario, shim is not used, and DB.pem is used to
+            # verify bootloader directly.
+            else:
+                uefi_sb_sign(input, output, d)
+        elif uks_signing_model(d) == 'edss':
+            edss_sign_efi_image(input, output, d)
+
+def shim_sb_sign(input, output, d):
+    if uks_signing_model(d) == 'sample' or uks_signing_model(d) == 'user':
         uefi_sb_sign(input, output, d)
+    elif uks_signing_model(d) == 'edss':
+        edss_sign_efi_image(input, output, d)
 
 def check_mok_sb_user_keys(d):
     dir = mok_sb_keys_dir(d)
@@ -82,6 +98,24 @@ def mok_sb_sign(input, output, d):
     if d.getVar('MOK_SB', True) == '1':
         _ = mok_sb_keys_dir(d)
         sign_efi_image(_ + 'shim_cert.key', _ + 'shim_cert.pem', input, output, d)
+
+# Prepare signing keys for shim
+def shim_prepare_sb_keys(d):
+    # For UEFI_SB, shim is not built
+    if d.getVar('MOK_SB', True) != '1':
+        return
+
+    create_mok_vendor_dbx(d)
+    # Prepare shim_cert and vendor_cert.
+    dir = mok_sb_keys_dir(d)
+    import shutil
+    shutil.copyfile(dir + 'shim_cert.pem', d.getVar('S', True) + '/shim.crt')
+    pem2der(dir + 'vendor_cert.pem', d.getVar('WORKDIR', True) + '/vendor_cert.cer', d)
+    d.appendVar('EXTRA_OEMAKE', ' VENDOR_CERT_FILE="${WORKDIR}/vendor_cert.cer"')
+
+    # add blacklist for user
+    if uks_signing_model(d) == 'user':
+       d.appendVar('EXTRA_OEMAKE', ' VENDOR_DBX_FILE="${WORKDIR}/vendor_dbx.esl"')
 
 def check_ima_user_keys(d):
     dir = uks_ima_keys_dir(d)
@@ -177,7 +211,7 @@ def __create_blacklist(d):
 # from loading the grub signed by the sample key, certain sample keys are
 # added to the blacklist.
 def create_mok_vendor_dbx(d):
-    if d.getVar('MOK_SB', True) != '1' or d.getVar('USE_USER_KEY', True) != '1':
+    if d.getVar('MOK_SB', True) != '1' or d.getVar('SIGNING_MODEL', True) != 'user':
         return
 
     __create_blacklist(d)
@@ -187,7 +221,7 @@ def create_mok_vendor_dbx(d):
                     d.getVar('WORKDIR', True) + '/vendor_dbx.esl')
 
 def create_uefi_dbx(d):
-    if d.getVar('UEFI_SB', True) != '1' or d.getVar('USE_USER_KEY', True) != '1':
+    if d.getVar('UEFI_SB', True) != '1' or d.getVar('SIGNING_MODEL', True) != 'user':
         return
 
     __create_blacklist(d)
@@ -285,7 +319,7 @@ def sanity_check_user_keys(name, may_exit, d):
 
 # *_KEYS_DIR need to be updated whenever reading them.
 def set_keys_dir(name, d):
-    if (d.getVar(name, True) != "1") or (d.getVar('USE_USER_KEY', True) != "1"):
+    if (d.getVar(name, True) != "1") or (d.getVar('SIGNING_MODEL', True) != "user"):
         return
 
     if d.getVar(name + '_KEYS_DIR', True) == d.getVar('SAMPLE_' + name + '_KEYS_DIR', True):
@@ -296,7 +330,7 @@ python do_check_user_keys_class-target () {
     vprint('Status before do_check_user_keys():', d)
     vprint('  MOK_SB: ${MOK_SB}', d)
     vprint('  UEFI_SB: ${UEFI_SB}', d)
-    vprint('  USE_USER_KEY: ${USE_USER_KEY}', d)
+    vprint('  SIGNING_MODEL: ${SIGNING_MODEL}', d)
     vprint('  MOK_SB_KEYS_DIR: ${MOK_SB_KEYS_DIR}', d)
     vprint('  UEFI_SB_KEYS_DIR: ${UEFI_SB_KEYS_DIR}', d)
     vprint('  IMA_KEYS_DIR: ${IMA_KEYS_DIR}', d)
@@ -306,7 +340,7 @@ python do_check_user_keys_class-target () {
 
     for _ in ('UEFI_SB', 'MOK_SB', 'IMA'):
         # Intend to use user key?
-        if (d.getVar(_, True) != "1") or ("${USE_USER_KEY}" != "1"):
+        if (d.getVar(_, True) != "1") or ("${SIGNING_MODEL}" != "user"):
             continue
 
         # Check if the generation for user key is required. If so,

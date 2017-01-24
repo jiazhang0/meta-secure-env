@@ -7,6 +7,7 @@ require efitools.inc
 SRC_URI_append = " \
     file://LockDown-enable-the-enrollment-for-DBX.patch \
     file://LockDown-show-the-error-message-with-3-sec-timeout.patch \
+    file://Makefile-do-not-build-signed-efi-image.patch \
 "
 
 COMPATIBLE_HOST = '(i.86|x86_64).*-linux'
@@ -36,12 +37,10 @@ python do_prepare_signing_keys() {
 
     import shutil
 
-    dir = uefi_sb_keys_dir(d)
-
     # Prepare PK, KEK and DB for LockDown.efi.
     for _ in ('PK', 'KEK', 'DB'):
-        shutil.copyfile(dir + _ + '.pem', '${S}/' + _ + '.crt')
-        shutil.copyfile(dir + _ + '.key', '${S}/' + _ + '.key')
+        shutil.copyfile('${SAMPLE_UEFI_SB_KEYS_DIR}/' + _ + '.pem', '${S}/' + _ + '.crt')
+        shutil.copyfile('${SAMPLE_UEFI_SB_KEYS_DIR}/' + _ + '.key', '${S}/' + _ + '.key')
 
     create_uefi_dbx(d)
 }
