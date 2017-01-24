@@ -8,4 +8,5 @@ include packagegroup-ima.inc
 
 RDEPENDS_${PN} += " \
     key-store-ima-privkey \
+    ima-evm-utils-evmctl.static \
 "
