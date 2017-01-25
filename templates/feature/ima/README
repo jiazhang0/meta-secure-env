@@ -153,6 +153,9 @@ Known Issues
   Note: RPM installation violates the IMA appraisal but its post_install
   operation will always re-sign the affected files.
 
+- Overwriting an existing file with the same content is deemed as tampering of
+  the file.
+
 Reference
 =========
 https://sourceforge.net/p/linux-ima/wiki/Home/
