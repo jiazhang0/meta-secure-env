@@ -109,6 +109,13 @@ allowed to define the use them during the installation.
   Define the IMA_PUBKEY variable, pointing to the path of public key file.
   Define the IMA_PRIVKEY variable, pointing to the path of private key file.
 
+Installer command line
+======================
+# cd /opt/installer/sbin
+# ./cubeit-installer --ima-sign -b <options> <device>
+
+where --ima-sign indicates the installer will label systems with IMA signing.
+
 Best practice
 =============
 The following best practices should be applied with IMA.
