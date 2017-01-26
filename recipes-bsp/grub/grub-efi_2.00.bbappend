@@ -59,8 +59,12 @@ do_install_append_class-target() {
         sed -i '/^\s*initrd /d' $cfg
     fi
 
-    # Enable integrity audit log and the default IMA rules if IMA is enabled.
-    [ x"${IMA}" = x"1" ] && ! grep -q "ima_policy=tcb" $cfg &&
+    # Enable the default IMA rules if IMA is enabled and storage-encryption is
+    # disabled. This is because unseal operation will fail when any PCR is
+    # extended due to updating the aggregate integrity value by the default
+    # IMA rules.
+    [ x"${IMA}" = x"1" -a x"${STORAGE_ENCRYPTION}" != x"1" ] &&
+        ! grep -q "ima_policy=tcb" $cfg &&
         sed -i 's/^\s*chainloader .*rootwait.*/& ima_policy=tcb/' $cfg
 
     # Create a boot entry for Automatic Key Provision. This is required because
