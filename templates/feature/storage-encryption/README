@@ -143,3 +143,11 @@ encrypted rootfs.
 - Reboot
 After reboot to initramfs, it employs a init script to transparently
 unseal the passphrase and mount the rootfs without any interaction.
+
+Known Issues
+============
+- The default IMA rules provides the ability of measuring the boot components
+  and calculating the aggregate integrity value for attesting. However, this
+  function conflicts with storage-encryption feature which employs PCR policy
+  session to retrieve the passphrase in a safe way. If the installer enables
+  both of them, the default IMA rules will be not used.
