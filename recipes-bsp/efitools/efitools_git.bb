@@ -36,12 +36,17 @@ python do_prepare_signing_keys() {
     if '${UEFI_SB}' != '1':
         return
 
+    # Prepare PK, KEK and DB for LockDown.efi.
+    if uks_signing_model(d) in ('sample', 'user'):
+        dir = uefi_sb_keys_dir(d)
+    else:
+        dir = '${SAMPLE_UEFI_SB_KEYS_DIR}/'
+
     import shutil
 
-    # Prepare PK, KEK and DB for LockDown.efi.
     for _ in ('PK', 'KEK', 'DB'):
-        shutil.copyfile('${SAMPLE_UEFI_SB_KEYS_DIR}/' + _ + '.pem', '${S}/' + _ + '.crt')
-        shutil.copyfile('${SAMPLE_UEFI_SB_KEYS_DIR}/' + _ + '.key', '${S}/' + _ + '.key')
+        shutil.copyfile(dir + _ + '.pem', '${S}/' + _ + '.crt')
+        shutil.copyfile(dir + _ + '.key', '${S}/' + _ + '.key')
 
     path = create_uefi_dbx(d)
     if path:
