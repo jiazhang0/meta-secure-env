@@ -361,7 +361,7 @@ python do_check_user_keys_class-target () {
         # Check if the generation for user key is required. If so,
         # place the generated user keys to export/images/user-keys/.
         if d.getVar(_ + '_KEYS_DIR', True) == d.getVar('SAMPLE_' + _ + '_KEYS_DIR', True):
-            d.setVar(_ + '_KEYS_DIR', '${DEPLOY_DIR_IMAGE}' + '/user-keys/' + _.lower() + '_sb_keys')
+            d.setVar(_ + '_KEYS_DIR', '${DEPLOY_DIR_IMAGE}' + '/user-keys/' + _.lower() + '_keys')
 
             if sanity_check_user_keys(_, False, d) == False:
                 create_user_keys(_, d)
