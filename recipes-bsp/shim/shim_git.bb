@@ -83,13 +83,15 @@ addtask sign after do_compile before do_install
 
 do_install() {
     install -d ${D}${EFI_TARGET}
-    install -m 0600 ${B}/mm${EFI_ARCH}.efi.signed ${D}${EFI_TARGET}/mm${EFI_ARCH}.efi
 
-    local dst="${D}${EFI_TARGET}/boot${EFI_ARCH}.efi"
+    local shim_dst="${D}${EFI_TARGET}/boot${EFI_ARCH}.efi"
+    local mm_dst="${D}${EFI_TARGET}/mm${EFI_ARCH}.efi"
     if [ x"${UEFI_SB}" = x"1" ]; then
-        install -m 0600 ${B}/shim${EFI_ARCH}.efi.signed $dst
+        install -m 0600 ${B}/shim${EFI_ARCH}.efi.signed $shim_dst
+        install -m 0600 ${B}/mm${EFI_ARCH}.efi.signed $mm_dst
     else
-        install -m 0600 ${B}/shim${EFI_ARCH}.efi $dst
+        install -m 0600 ${B}/shim${EFI_ARCH}.efi $shim_dst
+        install -m 0600 ${B}/mm${EFI_ARCH}.efi $mm_dst
     fi
 }
 
