@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2015-2016 Wind River Systems, Inc.
+# Copyright (C) 2015-2017 Wind River Systems, Inc.
 #
 
 SUMMARY = "shim is a trivial EFI application."
@@ -72,7 +72,7 @@ FILES_${PN} += "${EFI_TARGET}"
 python do_prepare_signing_keys() {
     shim_prepare_sb_keys(d)
 }
-addtask prepare_signing_keys after do_configure before do_compile
+addtask prepare_signing_keys after do_check_user_keys before do_compile
 
 python do_sign() {
     shim_sb_sign('${S}/shim${EFI_ARCH}.efi', '${B}/shim${EFI_ARCH}.efi.signed', d)
@@ -83,13 +83,15 @@ addtask sign after do_compile before do_install
 
 do_install() {
     install -d ${D}${EFI_TARGET}
-    install -m 0600 ${B}/mm${EFI_ARCH}.efi.signed ${D}${EFI_TARGET}/mm${EFI_ARCH}.efi
 
-    local dst="${D}${EFI_TARGET}/boot${EFI_ARCH}.efi"
+    local shim_dst="${D}${EFI_TARGET}/boot${EFI_ARCH}.efi"
+    local mm_dst="${D}${EFI_TARGET}/mm${EFI_ARCH}.efi"
     if [ x"${UEFI_SB}" = x"1" ]; then
-        install -m 0600 ${B}/shim${EFI_ARCH}.efi.signed $dst
+        install -m 0600 ${B}/shim${EFI_ARCH}.efi.signed $shim_dst
+        install -m 0600 ${B}/mm${EFI_ARCH}.efi.signed $mm_dst
     else
-        install -m 0600 ${B}/shim${EFI_ARCH}.efi $dst
+        install -m 0600 ${B}/shim${EFI_ARCH}.efi $shim_dst
+        install -m 0600 ${B}/mm${EFI_ARCH}.efi $mm_dst
     fi
 }
 

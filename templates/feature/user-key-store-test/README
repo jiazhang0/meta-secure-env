@@ -15,7 +15,7 @@ this tempalte (feature/user-key-store-test/template.conf) as an example
 to get the required definitions in order to enable the user key store.
 The vital definitions include:
 
-- USE_USER_KEY = "1"
+- SIGNING_MODEL = "user"
   Prohibit using the sample keys for signing the images.
 
 - UEFI_SB_KEYS_DIR := "<path>"

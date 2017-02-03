@@ -105,7 +105,8 @@ def shim_prepare_sb_keys(d):
     if d.getVar('MOK_SB', True) != '1':
         return
 
-    create_mok_vendor_dbx(d)
+    path = create_mok_vendor_dbx(d)
+
     # Prepare shim_cert and vendor_cert.
     dir = mok_sb_keys_dir(d)
     import shutil
@@ -212,23 +213,37 @@ def __create_blacklist(d):
 # added to the blacklist.
 def create_mok_vendor_dbx(d):
     if d.getVar('MOK_SB', True) != '1' or d.getVar('SIGNING_MODEL', True) != 'user':
-        return
+        return None
+
+    src = d.getVar('TMPDIR', True) + '/blacklist.esl'
+    import os
+    if os.path.exists(src):
+        os.remove(src)
 
     __create_blacklist(d)
 
+    dst = d.getVar('WORKDIR', True) + '/vendor_dbx.esl'
     import shutil
-    shutil.copyfile(d.getVar('TMPDIR', True) + '/blacklist.esl', \
-                    d.getVar('WORKDIR', True) + '/vendor_dbx.esl')
+    shutil.copyfile(src, dst)
+
+    return dst
 
 def create_uefi_dbx(d):
     if d.getVar('UEFI_SB', True) != '1' or d.getVar('SIGNING_MODEL', True) != 'user':
-        return
+        return None
+
+    src = d.getVar('TMPDIR', True) + '/blacklist.esl'
+    import os
+    if os.path.exists(src):
+        os.remove(src)
 
     __create_blacklist(d)
 
+    dst = d.getVar('WORKDIR', True) + '/DBX.esl'
     import shutil
-    shutil.copyfile(d.getVar('TMPDIR', True) + '/blacklist.esl', \
-                    d.getVar('S', True) + '/DBX.esl')
+    shutil.copyfile(src, dst)
+
+    return dst
 
 create_uefi_sb_user_keys() {
     local deploy_dir="${DEPLOY_DIR_IMAGE}/user-keys/uefi_sb_keys"
@@ -346,7 +361,7 @@ python do_check_user_keys_class-target () {
         # Check if the generation for user key is required. If so,
         # place the generated user keys to export/images/user-keys/.
         if d.getVar(_ + '_KEYS_DIR', True) == d.getVar('SAMPLE_' + _ + '_KEYS_DIR', True):
-            d.setVar(_ + '_KEYS_DIR', '${DEPLOY_DIR_IMAGE}' + '/user-keys/' + _.lower() + '_sb_keys')
+            d.setVar(_ + '_KEYS_DIR', '${DEPLOY_DIR_IMAGE}' + '/user-keys/' + _.lower() + '_keys')
 
             if sanity_check_user_keys(_, False, d) == False:
                 create_user_keys(_, d)
