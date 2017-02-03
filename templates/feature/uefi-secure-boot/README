@@ -157,9 +157,9 @@ Run a key provision by self
 A present user needs to disable UEFI secure boot in BIOS setup first and
 enroll the self-owned certificate to replace the default Microsoft certificate,
 and then sign grub2 and kernel with the self-owned key. Refer to the section
-"Automatic Key Provision" for details about how to make the key enrollment
-automatical, and refer to feature/user-key-store-test to use the self-owned
-key for signing during the build.
+"Automatic Certificate Provision" for details about how to make the key
+enrollment automatic, and refer to feature/user-key-store-test to use the
+self-owned key for signing during the build.
 
 Use MOK secure boot
 -------------------

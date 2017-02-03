@@ -106,8 +106,8 @@ User Keys
 Refer to feature/user-key-store for the details about how to generate/use the
 keys owned by the user.
 
-Automatic Key Provision
------------------------
+Automatic Certificate Provision
+-------------------------------
 Refer to the cognominal section in feature/uefi-secure-boot/README. Mok Secure
 Boot is on top of UEFI Secure Boot so it is still necessary to set up the
 environment for UEFI Secure Boot.
