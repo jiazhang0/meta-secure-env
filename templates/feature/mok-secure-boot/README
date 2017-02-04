@@ -1,8 +1,9 @@
-Mok Secure Boot Notes
-=====================
+MOK Secure Boot
+===============
 
-Mok secure boot is based on the industry standard UEFI secure boot, adding
-the shim loader to chainloader the second-stage bootloader like grub2.
+MOK (Machine Owner Key) secure boot is based on the industry standard UEFI
+secure boot, adding the shim loader to chainloader the second-stage bootloader
+like grub2.
 
 [ Quoting: https://github.com/rhinstaller/shim ]
 shim is a trivial EFI application that, when run, attempts to open and
@@ -20,65 +21,70 @@ this entry point expects to be called with SysV ABI rather than MSABI, and
 so calls to it should not be wrapped.
 [ End of Quote ]
 
-shim + grub2 is the mainstream used by many linux distributions to handle
-Microsoft certificated hardware with a windows logo sticker. For this
-kind of machines, Microsoft requires OEM enables UEFI secure boot by
-default, and the default key chains to Microsoft UEFI CA.
+A complete verification flow with MOK secure boot is:
+UEFI BIOS (UEFI secure boot enabled) ->
+    shim (verified by DB certificate) ->
+        grub2 (verified by shim-managed certificates) ->
+            kernel (verified by shim-managed certificates)
+
+Why using MOK secure boot and shim
+----------------------------------
+In most cases, the hardware coming out of the factory is already provisioned
+with a default certificate used to verify the bootloader and issued by
+Microsoft Corporation UEFI CA 2011. This kind of hardware is so-called
+Microsoft certificated hardware.
 
 Obviously, this requirement needs the bootloader directly loaded by BIOS
-must be signed with Microsoft's key. Microsoft provides with signing
-service (not free), and only accept shim loader for Linux world. Refer to
+must be signed by Microsoft. Microsoft provides the signing service
+(not free), but only accept shim loader for Linux world. Refer to
 Microsoft's signing policy from here:
 http://blogs.msdn.com/b/windows_hardware_certification/archive/2013/12/03/microsoft-uefi-ca-signing-policy-updates.aspx
 
-We carefully handle the packages licensed under GPLv3 like grub2 all the
-time. According to the Microsoft's signing policy above, the bootloader
-prepared to be submitted to Microsoft for signing must not be subject to
-GPLv3 which purports to give end user the right to demand authorization
-keys to be able to install modified forms of the code on a device. If a
-customer is a device vendor and hope to secure the system with UEFI secure
-boot, shim + grub2 is almost the only choice. With this signing model, grub2
-could be signed by the key owned by the end users without the limit by
-Microsoft's signing policy.
+Of course, the user can manually remove all default certificates and use
+the self-owned keys to have a working UEFI secure boot, but this is not
+working for ODM/OEM customers because this extra step is bad for the user
+experience. Refer to the section "Out-of-box Experience" in
+feature/uefi-secure-boot/README for the details.
 
-A complete verification flow with Mok secure boot looks like this:
-UEFI BIOS (UEFI secure boot enabled) ->
-  shim (verified by DB) ->
-    grub2 (verified by shim with shim-managed certs) ->
-      kernel (verified by grub2 with shim-managed certs)
+For a good user experience, shim + grub2 is the mainstream used by many Linux
+distributions to handle Microsoft certificated hardware. With this model, grub2
+is signed by the shim certificate or MOK certificate without being subject to
+the limit from Microsoft's signing policy, and the extra step is thus omitted.
 
-Note:
-If user doesn't needs to use the default Microsoft's key in order to
-enable UEFI secure boot, Mok Secure Boot feature could be ignored. Just use
-the secret key owned by user to sign grub2 and kernel. In this case, shim is
-not required.
+Why not using MOK secure boot and shim
+--------------------------------------
+If the user hopes to use the self-owned keys and doesn't concern about the
+inconvenience of manual key provision for UEFI secure boot, MOK secure boot
+feature will become unnecessary.
 
-Limit
------
-The 32-bit Mok Secure Boot is not validated. In other words, loading 32-bit
-shim, Mok manager, grub2 and kernel is not supported.
+Build
+=====
 
-Build Project With This Feature
-===============================
+In order to enable this feature, add the path to
+feature/mok-secure-boot/template.conf to the init script.
 
-This template (feature/mok-secure-boot) is based on feature/uefi-secure-boot,
-so it is not required to explicitly specify
---with-template=feature/uefi-secure-boot in the project configuration if this
-template is used.
+Dependency
+==========
+
+This feature depends on feature/uefi-secure-boot.
 
 Key Management
 ==============
 
+Note that the sample key and user key are the concepts in the key signing
+model according to the ownership and secrecy. In MOK secure boot, the policy
+object such as shim certificate, vendor certificate and MOK certificate will
+be mapped to a key managed by the key signing model.
+
 Sample keys
 -----------
-This template (feature/mok-secure-boot), by default, use the sample keys
-generated by Wind River for signing and verifing images for test, development
-and demonstration. Please ensure you know what your risk is to use them in
-your product.
+This template, by default, use the sample keys to sign and verify images for
+the purpose of development and demonstration. Please ensure you know what your
+risk is to use the sample keys in your product, because they are completely
+public.
 
-The sample keys are centrally placed under
-layers/meta-secure-env/file/mok_sb_keys. This template uses the following key
-pair:
+The sample keys are centrally placed under files/mok_sb_keys/. This template
+uses the following key pairs:
 
   * shim_cert.pem
     The X509 certificate embedded in shim, used to verify the images either
@@ -108,106 +114,108 @@ keys owned by the user.
 
 Automatic Certificate Provision
 -------------------------------
-Refer to the cognominal section in feature/uefi-secure-boot/README. Mok Secure
-Boot is on top of UEFI Secure Boot so it is still necessary to set up the
-environment for UEFI Secure Boot.
+Refer to the section "Automatic Certificate Provision" in
+feature/uefi-secure-boot/README. MOK secure boot is on top of UEFI secure boot
+so it is still necessary to provision UEFI secure boot before using MOK secure
+boot.
 
-mokutil and Mok Manager
------------------------
-mokutil is a tool to import or delete the machines owner keys (MOK) stored in
-the database of shim. mokutil creates the requests and Mok manager will be
+mokutil and MOK Manager
+=======================
+
+mokutil is a tool to import or delete the machines owner keys stored in
+the database of shim. mokutil creates the requests and MOK manager will be
 automatically launched by shim as long as it detects the pending requests.
 The physical present user will be prompted to run the operations corresponding
-to the requests. Note the operation is required to be authenticated by Mok
+to the requests. Note the operation is required to be authenticated by MOK
 management password set by mokutil.
 
 Refer to mokutil man page for the detailed usages. To show mokutil man page,
 run the following command:
 
 $ cd $project
-$ export MANPATH=bitbake_build/tmp/work/corei7-64-wrs-linux/mokutil/0.3.*/packages-split/mokutil-doc/usr/share:$MANPATH
+$ export MANPATH=tmp/work/core2-64-wrs-linux/mokutil/*/packages-split/mokutil-doc/usr/share:$MANPATH
 $ man mokutil
 
-Mok Management Password
-~~~~~~~~~~~~~~~~~~~~~~~
-Mok management password is the authentication information to allow Mok manager
+MOK Management Password
+-----------------------
+MOK management password is the authentication information to allow MOK manager
 to grant the request regarding of MOK management. To set the password, run
 mokutil with the option --password. In addition, there are 4 input methods to
 provide the password. By default, mokutil prompts the user to input the
 password and then wraps the password to sha256 password hash. For other 3
 methods, refer to the uses of option --hash-file, --root-pw and --simple-hash.
 
-Enroll the MOK
-~~~~~~~~~~~~~~
+Enroll the MOK certificate
+--------------------------
 Here is an example showing how to enroll a DER formatted X509 certificate to
 the database of shim.
 
 # mokutil --import <cert.cer>
 
-where <cert.cer> is the MOK corresponding to the certificate associating with
-the private key used to sign either grub2 or kernel.
+where <cert.cer> is the MOK certificate corresponding to the private key used
+to sign either grub2 or kernel.
 
 To convert a PEM, for exmaple, the shim_cert.pem, to a DER formatted X509
 certificate, type the command:
-$ openssl x509 -in shim_cert.pem -inform PEM -out shim_cert.cer -outform DER 
+$ openssl x509 -in shim_cert.pem -inform PEM -out shim_cert.cer -outform DER
 
 List the enrollment requests
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+----------------------------
 The several enrollment requests can be submitted before system reboot. Run the
 following command to check all enrollment requests.
 
 # mokutil --list-new
 
 Revoke the enrollment requests
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+------------------------------
 Note the revocation operation will remove all enrollment requests.
 
 # mokutil --revoke-import
 
-Test the MOK
-~~~~~~~~~~~~
+Test the MOK certificate
+------------------------
 If you cannot confirm whether a certificate has been enrolled or not, type the
 following command for a check:
 
 # mokutil --test-key <cert.cer>
 
-Delete the MOK
-~~~~~~~~~~~~~~
-Removing an useless MOK is also supported.
+Delete the MOK certificate
+--------------------------
+Removing an useless MOK certificate is also supported.
 
 # mokutil --delete <cert.cer>
 
 Refer to the options --list-delete and --revoke-delete to list and revoke the
 MOKs.
 
-Reset MOKs
-~~~~~~~~~~
-This request will clear all enrolled MOKs.
+Reset MOK certificates
+----------------------
+This request will clear all enrolled MOK certificates.
 
 # mokutil --reset
 
-Disable/Enable Mok Secure Boot
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Mok Secure Boot can be enabled or disabled regardless of the setting of UEFI
-Secure Boot.
+Disable/Enable MOK Secure Boot
+------------------------------
+MOK secure boot can be enabled or disabled regardless of the setting of UEFI
+secure boot.
 
-# mokutil --disable-validation	// disable Mok Secure Boot
-# mokutil --enable-validation	// dnable Mok Secure Boot
+# mokutil --disable-validation  // disable MOK secure boot
+# mokutil --enable-validation   // enable MOK secure boot
 
-Note that Mok Secure Boot is based on UEFI Secure Boot. If UEFI Secure Boot
-is disabled, Mok Secure Boot will be automatically inactive. Type the
-following command to check the status of UEFI Secure Boot.
+Note that MOK secure boot is based on UEFI secure boot. If UEFI secure boot
+is disabled, MOK secure boot will be automatically inactive. Type the
+following command to check the status of UEFI secure boot.
 
 # mokutil --sb-state
 
 Others
-~~~~~~
+------
 Refer to the options --import-hash and --delete-hash to manage hash-based
 signature. The options --pk, --kek, --db and --dbx are useful to check
-the content of the policy objects used in UEFI Secure Boot.
+the content of the policy objects used in UEFI secure boot.
 
 Manage blacklist
-~~~~~~~~~~~~~~~~
+----------------
 All above mentioned are talking MOK which is acting as whitelist to
 authenticate the verified image to launch. Actually, there is a contrary
 policy object called MOKX, acting as blacklist to deny the untrusted
@@ -229,52 +237,112 @@ options to change the operation target from MOK to the following options.
 --revoke-import
 --revoke-delete
 
-Kernel Verification
-===================
-
-When grub2 loads kernel image with the chainloader command, if both UEFI Secure
-Boot and Mok Secure Boot are already enabled, the UEFI BIOS will validate the
-kernel image firstly. If the kernel image is not signed with the private key
-corresponding to one of certificates enrolled in DB and not in DBX, then grub2
-will instead employ the verification protocol installed by shim to validate
-the kernel image signed with machine owner key, shim certificate or vendor
-certificate. The benefit of this behavior allows the end user to regulate the
-secure boot even without the ownership of DB.
-
-By default, the build system will use shim certificate to automatically sign
-the kernel image during the build. Therefore, the kernel image in RPM package,
-$project/export/dist/boot/bzImage file and $project/export/images/bzImage* are
-all signed.
-
-Manually sign kernel image
---------------------------
-Refer to the cognominal section in feature/uefi-secure-boot/README. Note that
-machine owner key, shim certificate or vendor certificate can be used for
-<key> and <cert> in the scenario of Mok Secure Boot.
-
-Boot Menu Entry in grub.cfg
----------------------------
-Refer to the cognominal section in feature/uefi-secure-boot/README.
-
-Handle Mok Secure Boot Failure
-==============================
-
-If the grub2 is not signed or signed with an unauthorized certificate, the
-shim will prompt the end user a UI called Mok manager to guide the user to
+Handle MOK Secure Boot Failure with MOK Manager
+-----------------------------------------------
+If grub2 or kernel is not signed or signed with an unauthorized certificate,
+the shim will prompt the end user a UI called MOK manager to guide the user to
 enroll the certificate or hash of the image.
 
 The policy of the selection between digest and certificate for next step is
-decided by whether the unauthorized grub2 image is signed or not.
+decided by whether the unauthorized grub2 or kernel image is signed or not.
 
-If the grub2 image is not signed at all, you have to always select the
-calculation of the digest for grubx64.efi file. Note that once the grubx64.efi
-is replaced and its digest is changed, you have to relaunch the Mok manager
-to enroll the hash of the grub2 image.
+If the grub2 or kernel image is not signed at all, you have to always select
+the calculation of the digest based on the file. Note that once grub2 or kernel
+is updated and its digest is changed, you have to relaunch the MOK manager
+to enroll the new digests.
 
-If the grub2 image is signed by an unauthorized certificate, enrolling the
-signing certificate is the preferred way. Copy the signing certificate to
-the boot drive and then select the cetificate in Mok manager. Note that
-the certificate for the selection must be DER formatted.
+If the grub2 or kernel image is signed by an unauthorized certificate,
+enrolling the signing certificate is the preferred way. Copy the certificate
+to the boot drive and then select the certificate in MOK manager. Note that the
+certificate for the selection must be DER formatted.
 
-If doing so, the unauthorized grub2 will be verified successfully after
-exiting Mok Manager.
+If doing so, the unauthorized grub2 or kernel will be verified successfully
+after exiting MOK Manager.
+
+Verification
+============
+
+By default, the build system will use DB.key to automatically sign shim, and use
+shim_cert.key to sign grub2 and kernel image during the build.
+
+Shim Loader Verification
+------------------------
+More specifically, UEFI BIOS will validate the integrity of shim before
+running it with a certificate in DB. Usually, shim is signed with the
+DB.key corresponding to DB.pem.
+
+Either situation will cause the failure of verification.
+- shim is not signed.
+- shim is signed with DB.key which doesn't correspond to any certificate in
+  DB.
+- shim is signed with DB.key which corresponds to a certificate in DBX.
+
+Of course, all above conclusions assume UEFI secure boot is already enabled.
+
+Grub2 Loader Verification
+-------------------------
+When shim loads grub2, if both UEFI secure boot and MOK secure boot are already
+enabled, shim uses a list of certificate to check the integrity of grub2.
+
+- Blacklist check
+  If grub2 is signed with a key corresponding to a certificate within any of a
+  policy object below, the boot failure will occur.
+
+  * Vendor DBX
+  * DBX
+  * MokListX (MOK certificate blacklist)
+
+- Whitelist check
+  If grub2 is signed with a key corresponding to a certificate within any of a
+  policy object below, the boot success will occur.
+
+  * DB
+  * MokList (MOK certificate whitelist)
+  * Shim certificate
+  * Vendor certificate
+
+If grub2 is not signed or signed by a key not corresponding to any policy
+objects mentioned above, the boot failure will occur.
+
+The benefit of these behaviors allow the end user to regulate the secure boot
+even without the ownership of DB on Microsoft certificated hardware.
+
+Kernel Verification
+-------------------
+When grub2 loads kernel image with the chainloader command, if both UEFI secure
+boot and MOK secure boot are already enabled, grub2 will call the verification
+protocol installed by shim to validate the kernel image in the same way as shim
+verifies grub2.
+
+Manually Sign Kernel Image
+--------------------------
+Refer to the cognominal section in feature/uefi-secure-boot/README.
+
+Work Flow
+=========
+
+- Build a project with this template and feature/uefi-secure-boot
+
+- Deploy the rootfs
+
+- Boot up the target board
+
+- Enter to BIOS setup and remove the default certificates
+
+- Boot to "Automatic Certificate Provision"
+
+- Enable UEFI secure boot again in BIOS setup
+
+- Manually reset the board again*
+
+- Boot to the system with the protection provided by UEFI secure boot and
+  MOK secure boot
+
+* Otherwise, a misleading error message about the verification failure will
+  be displayed.
+
+Known Issues
+============
+
+- The 32-bit MOK secure boot is not validated. In other words, loading 32-bit
+shim, MOK manager, grub2 and kernel is not supported.
