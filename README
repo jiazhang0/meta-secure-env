@@ -95,16 +95,13 @@ provides some protection against offline tampering of the files.
 Refer to feature/ima/README for more details.
 
 Maintenance
------------
+===========
 This layer is maintained in Wind River Open Source Labs at github.
 * source	https://github.com/WindRiver-OpenSourceLabs/meta-secure-env
 
 
 Building the meta-secure-env layer
-----------------------------------
+==================================
+
 This layer should be added to the bblayers.conf file. To enable certain
 feature provided by this layer, add the feature to the local.conf file. 
-
-For pulsar binary release, this layer is included by default, and UEFI/Mok
-secure boot feature is enabled by default for x86 machine. These are done
-in the init-intel-x86-env file.
