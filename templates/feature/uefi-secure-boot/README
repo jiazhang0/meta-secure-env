@@ -9,15 +9,31 @@ UEFI BIOS (UEFI secure boot enabled) ->
     grub2 (verified by DB certificate) ->
         kernel (verified by DB certificate)
 
+Build
+=====
+
+In order to enable this feature, add the path to
+feature/uefi-secure-boot/template.conf to the init script.
+
+Dependency
+==========
+
+This feature doesn't depend on other layer or template.
+
 Key Management
 ==============
 
+Note that the sample key and user key are the concepts in the key signing
+model according to the ownership and secrecy. In UEFI secure boot, the policy
+object such as PK, KEK, DB and DBX will be mapped to a key managed by the
+key signing model.
+
 Sample Keys
 -----------
-This template (feature/uefi-secure-boot), by default, use the sample keys
-to sign and verify images for the purpose of development and demonstration.
-Please ensure you know what your risk is to use the sample keys in your
-product, because they are completely public.
+This template, by default, use the sample keys to sign and verify images for
+the purpose of development and demonstration. Please ensure you know what your
+risk is to use the sample keys in your product, because they are completely
+public.
 
 The sample keys are centrally placed under files/uefi_sb_keys/. This template
 uses the following key pairs:
@@ -101,7 +117,7 @@ verification for the next boot.
 Bootloader Verification
 -----------------------
 More specifically, UEFI BIOS will validate the integrity of grub2 before
-running it with a certificate in DB. Usually, the grub2 is signed with the
+running it with a certificate in DB. Usually, grub2 is signed with the
 DB.key corresponding to DB.pem.
 
 Either situation will cause the failure of verification.
@@ -140,15 +156,16 @@ is the corresponding certificate file.
 Out-of-box Experience
 =====================
 
-In most cases, the board coming out of the factory is already provisioned
-with a default certificate used to verify grub2 and issued by Microsoft
-Corporation UEFI CA 2011.
+In most cases, the hardware coming out of the factory is already provisioned
+with a default certificate used to verify the bootloader and issued by
+Microsoft Corporation UEFI CA 2011. This kind of hardware is so-called
+Microsoft certificated hardware.
 
 This means the grub2 must be signed by Microsoft. Otherwise the system cannot
 boot up. However, Microsoft signing policy refuses to sign any bootloaders
 licensed under GPLv3.
 
-For this situation, there are 3 solutions.
+For this situation, there are 2 solutions.
 
 Note: assuming the end user still needs to use secure boot.
 
@@ -204,7 +221,7 @@ Don't use the linux command in grub.cfg
 Be aware of the fact that the linux command used to parse and load kernel
 image is not working on the verification of kernel image. Actually it
 follows up linux boot protocol and doesn't run into the validation path
-provided by UEFI Secure Boot. Therefore, the boot menu entry written in
+provided by UEFI secure boot. Therefore, the boot menu entry written in
 grub.cfg must use the chainloader command like this:
 
 menuentry 'Kernel Verification' {
