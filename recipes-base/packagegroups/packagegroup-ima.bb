@@ -8,6 +8,8 @@ include packagegroup-ima.inc
 
 RDEPENDS_${PN} += " \
     attr \
-    key-store-ima-privkey \
     ima-evm-utils-evmctl.static \
 "
+
+# Note IMA private key is not available if user key signing model used.
+RRECOMMENDS_${PN} += "key-store-ima-privkey"
