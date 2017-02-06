@@ -1,11 +1,23 @@
-TPM 1.2 feature
-===============
-This feature enables tpm 1.2 support, including kernel option changes to enable tpm
-drivers, and picking up packages trousers, tpm-tools, openssl-tpm-engine, tpm-quote-tools.
-Note, testing package tss-testsuite isn't included in this feature.
+TPM 1.2
+=======
+
+This feature enables tpm 1.2 support, including kernel option changes to
+enable tpm drivers, and picking up packages trousers, tpm-tools,
+openssl-tpm-engine, tpm-quote-tools.
 
 Note:
-TPM 1.2 is not validated in this release.
+This feature is not fully validated.
+
+Build
+=====
+
+In order to enable this feature, add the path to
+feature/tpm/template.conf to the init script.
+
+Dependency
+==========
+
+This feature doesn't depend on other layer or template.
 
 TPM 1.2 packages
 ================
@@ -60,4 +72,3 @@ ready for use:
 
 Then, you can use the TPM for a specific need, such as key generation,
 sealing encrypted data, etc.
-
