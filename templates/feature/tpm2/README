@@ -1,5 +1,5 @@
-TPM 2.0 feature
-===============
+TPM 2.0
+=======
 
 This feature enables Trusted Platform Module (TPM 2.0) support, including 
 kernel option changes to enable tpm drivers, and picking up TPM 2.0 packages.
@@ -7,6 +7,17 @@ kernel option changes to enable tpm drivers, and picking up TPM 2.0 packages.
 Trusted Platform Module (TPM 2.0) is a microcontroller that stores keys,
 passwords, and digital certificates. A discrete TPM 2.0 offers the
 capabilities as part of the overall platform security requirements.
+
+Build
+=====
+
+In order to enable this feature, add the path to
+feature/tpm2/template.conf to the init script.
+
+Dependency
+==========
+
+This feature depends on feature/tpm.
 
 TPM 2.0 packages
 ================
