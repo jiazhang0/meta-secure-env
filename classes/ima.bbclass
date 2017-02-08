@@ -12,15 +12,16 @@ python package_ima_hook() {
     packages = d.getVar('PACKAGES', True)
     pkgdest = d.getVar('PKGDEST', True)
 
-    print("Writing IMA hooks in RPM for " + d.getVar('PN', True)) + ' ...'
+    pkg_blacklist = ('dbg', 'dev', 'doc', 'locale', 'staticdev')
+
+    bb.note("Writing IMA hooks in RPM for %s ..." % d.getVar('PN', True))
 
     for pkg in packages.split():
-        blacklist = ('dbg', 'dev', 'doc', 'locale', 'staticdev')
-
-        if (pkg.split('-')[-1] in blacklist) is True:
+        if (pkg.split('-')[-1] in pkg_blacklist) is True:
             continue
 
         pkgdestpkg = os.path.join(pkgdest, pkg)
+        # pkgfiles is global in this context.
         files = ' '.join([os.sep + os.path.relpath(_, pkgdestpkg) for _ in pkgfiles[pkg]])
 
         # During RPM update, it is impossible to update evmctl and dependent
@@ -33,10 +34,13 @@ python package_ima_hook() {
 
 # IMA post_install hook
 if [ -z "$D" ]; then
-    if [ -d /sys/kernel/security/ima -a -x /usr/sbin/''' + evmctl_bin + r''' ]; then
+    if [ -f /etc/keys/evm_privkey.pem -a -x /usr/sbin/''' + evmctl_bin + r''' ]; then
         files="''' + files + r'''"
 
         for f in $files; do
+            # IMA appraisal is only applied to the regular file
+            [ ! -f $f ] && continue
+
             /usr/sbin/''' + evmctl_bin + r''' ima_sign --rsa "$f"
         done
     fi
