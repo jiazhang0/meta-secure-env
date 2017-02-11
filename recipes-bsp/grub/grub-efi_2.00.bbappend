@@ -63,7 +63,7 @@ do_install_append_class-target() {
     # disabled. This is because unseal operation will fail when any PCR is
     # extended due to updating the aggregate integrity value by the default
     # IMA rules.
-    [ x"${IMA}" = x"1" -a x"${STORAGE_ENCRYPTION}" != x"1" ] &&
+    [ x"${IMA}" = x"1" -a x"${@bb.utils.contains('DISTRO_FEATURES', 'storage-encryption', '1', '', d)}" != x"1" ] &&
         ! grep -q "ima_policy=tcb" $cfg &&
         sed -i 's/^\s*chainloader .*rootwait.*/& ima_policy=tcb/' $cfg
 
