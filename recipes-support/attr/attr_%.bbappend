@@ -15,4 +15,4 @@ do_install_append_class-target() {
         ${D}${bindir}/setfattr.static
 }
 
-FILES_${PN}-setfattr.static += "${bindir}/setfattr.static"
+FILES_${PN}-setfattr.static = "${bindir}/setfattr.static"

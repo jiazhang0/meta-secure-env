@@ -1,6 +1,6 @@
 PACKAGES =+ "${PN}-evmctl.static"
 
-do_compile_append() {
+do_compile_append_class-target() {
     ${CC} ${CFLAGS} ${LDFLAGS} -static \
         -include config.h -L=${libdir} \
         -Wl,--start-group -lcrypto -lkeyutils -ldl \
@@ -8,8 +8,8 @@ do_compile_append() {
         -Wl,--end-group -o ${B}/src/evmctl.static
 }
 
-do_install_append() {
+do_install_append_class-target() {
     install -m 0700 ${B}/src/evmctl.static ${D}${sbindir}/evmctl.static
 }
 
-FILES_${PN}-evmctl.static += "${sbindir}/evmctl.static"
+FILES_${PN}-evmctl.static = "${sbindir}/evmctl.static"
