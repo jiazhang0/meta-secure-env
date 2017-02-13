@@ -6,7 +6,7 @@ DESCRIPTION = "Linux Integrity Measurement Architecture (IMA) subsystem"
 
 include packagegroup-ima.inc
 
-DEPEND += " \
+DEPENDS += " \
     ima-evm-utils-native \
     attr-native \
 "
