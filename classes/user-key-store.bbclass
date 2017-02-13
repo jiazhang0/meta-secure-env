@@ -5,6 +5,10 @@
 DEPENDS_append_class-target = " sbsigntool-native"
 USER_KEY_SHOW_VERBOSE = "1"
 
+UEFI_SB = '${@bb.utils.contains("DISTRO_FEATURES", "uefi-secure-boot", "1", "0", d)}'
+MOK_SB = '${@bb.utils.contains("DISTRO_FEATURES", "mok-secure-boot", "1", "0", d)}'
+IMA = '${@bb.utils.contains("DISTRO_FEATURES", "ima", "1", "0", d)}'
+
 def vprint(str, d):
     if d.getVar('USER_KEY_SHOW_VERBOSE', True) == '1':
         print(str)
@@ -343,8 +347,9 @@ def set_keys_dir(name, d):
 # Check and/or generate the user keys
 python do_check_user_keys_class-target () {
     vprint('Status before do_check_user_keys():', d)
-    vprint('  MOK_SB: ${MOK_SB}', d)
     vprint('  UEFI_SB: ${UEFI_SB}', d)
+    vprint('  MOK_SB: ${MOK_SB}', d)
+    vprint('  IMA: ${IMA}', d)
     vprint('  SIGNING_MODEL: ${SIGNING_MODEL}', d)
     vprint('  MOK_SB_KEYS_DIR: ${MOK_SB_KEYS_DIR}', d)
     vprint('  UEFI_SB_KEYS_DIR: ${UEFI_SB_KEYS_DIR}', d)
