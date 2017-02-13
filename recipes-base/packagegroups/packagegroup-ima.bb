@@ -6,6 +6,11 @@ DESCRIPTION = "Linux Integrity Measurement Architecture (IMA) subsystem"
 
 include packagegroup-ima.inc
 
+DEPEND += " \
+    ima-evm-utils-native \
+    attr-native \
+"
+
 RDEPENDS_${PN} += " \
     attr \
     util-linux-switch_root.static \
