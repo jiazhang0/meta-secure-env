@@ -8,6 +8,8 @@ include packagegroup-ima.inc
 
 RDEPENDS_${PN} += " \
     attr \
+    util-linux-switch_root.static \
+    attr-setfattr.static \
     ima-evm-utils-evmctl.static \
 "
 

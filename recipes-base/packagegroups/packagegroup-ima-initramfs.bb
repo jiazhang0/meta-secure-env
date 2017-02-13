@@ -9,5 +9,4 @@ include packagegroup-ima.inc
 RDEPENDS_${PN} += " \
     keyutils \
     ima-policy \
-    util-linux-switch_root.static \
 "
