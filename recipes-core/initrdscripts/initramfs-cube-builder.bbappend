@@ -6,11 +6,13 @@ SRC_URI += "\
 "
 
 do_install_append() {
-    [ x"${@bb.utils.contains('DISTRO_FEATURES', 'storage-encryption', '1', '', d)}" = x"1" ] &&
+    if [ x"${@bb.utils.contains('DISTRO_FEATURES', 'storage-encryption', '1', '0', d)}" = x"1" ]; then
         install -m 0500 ${WORKDIR}/init.cryptfs ${D}
+    fi
 
-    [ x"${@bb.utils.contains('DISTRO_FEATURES', 'ima', '1', '', d)}" = x"1" ] &&
+    if [ x"${@bb.utils.contains('DISTRO_FEATURES', 'ima', '1', '0', d)}" = x"1" ]; then
         install -m 0500 ${WORKDIR}/init.ima ${D}
+    fi
 }
 
 FILES_${PN} += " \
