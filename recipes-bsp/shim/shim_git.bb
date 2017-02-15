@@ -30,6 +30,7 @@ SRC_URI = " \
         file://Fix-the-world-build-failure-due-to-the-missing-rule-.patch \
         file://Don-t-enforce-to-use-gnu89-standard.patch \
 	file://Makefile-do-not-sign-the-efi-file.patch \
+	file://Always-run-LockDown.efi-if-not-in-secure-mode-to-pro.patch \
 "
 SRCREV = "431d893b41c53f6a022031ca0cc66fd298e0e472"
 PV = "0.9+git${SRCPV}"
