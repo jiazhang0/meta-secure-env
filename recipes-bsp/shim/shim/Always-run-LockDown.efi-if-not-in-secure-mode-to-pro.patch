@@ -1,0 +1,49 @@
+From 53c6d8cd5a0f914475e819e13d2c49f844cfc06c Mon Sep 17 00:00:00 2001
+From: Lans Zhang <jia.zhang@windriver.com>
+Date: Wed, 15 Feb 2017 13:35:49 +0800
+Subject: [PATCH] Always run LockDown.efi if not in secure mode to provision
+ MOK
+
+The LockDown.efi should always be run if the system is not running in
+secure mode because all the other pieces of the system expect to be
+running in secure mode if you are using the shim.
+
+If LockDown.efi is not found or secure boot was provisioned, grub
+will be executed.
+
+Signed-off-by: Jason Wessel <jason.wessel@windriver.com>
+Signed-off-by: Lans Zhang <jia.zhang@windriver.com>
+---
+ shim.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/shim.c b/shim.c
+index b5f1a2b..43779c5 100644
+--- a/shim.c
++++ b/shim.c
+@@ -61,6 +61,8 @@
+ 
+ #define OID_EKU_MODSIGN "1.3.6.1.4.1.2312.16.1.2"
+ 
++EFI_STATUS execute(EFI_HANDLE image, CHAR16 *name);
++
+ static EFI_SYSTEM_TABLE *systab;
+ static EFI_HANDLE image_handle;
+ static EFI_STATUS (EFIAPI *entry_point) (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table);
+@@ -2695,6 +2697,13 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
+ 	debug_hook();
+ 
+ 	/*
++	 * If not in secure mode try to run LockDown.efi to get into
++	 * secure mode
++	 */
++	if (!secure_mode())
++		execute(image_handle, L"\\LockDown.efi");
++
++	/*
+ 	 * Measure the MOK variables
+ 	 */
+ 	efi_status = measure_mok();
+-- 
+2.7.4
+

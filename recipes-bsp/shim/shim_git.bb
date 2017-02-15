@@ -30,6 +30,7 @@ SRC_URI = " \
         file://Fix-the-world-build-failure-due-to-the-missing-rule-.patch \
         file://Don-t-enforce-to-use-gnu89-standard.patch \
 	file://Makefile-do-not-sign-the-efi-file.patch \
+	file://Always-run-LockDown.efi-if-not-in-secure-mode-to-pro.patch \
 "
 SRCREV = "431d893b41c53f6a022031ca0cc66fd298e0e472"
 PV = "0.9+git${SRCPV}"
@@ -76,8 +77,8 @@ addtask prepare_signing_keys after do_check_user_keys before do_compile
 
 python do_sign() {
     shim_sb_sign('${S}/shim${EFI_ARCH}.efi', '${B}/shim${EFI_ARCH}.efi.signed', d)
-    shim_sb_sign('${S}/mm${EFI_ARCH}.efi', '${B}/mm${EFI_ARCH}.efi.signed', d)
-    shim_sb_sign('${S}/fb${EFI_ARCH}.efi', '${B}/fb${EFI_ARCH}.efi.signed', d)
+    sb_sign('${S}/mm${EFI_ARCH}.efi', '${B}/mm${EFI_ARCH}.efi.signed', d)
+    sb_sign('${S}/fb${EFI_ARCH}.efi', '${B}/fb${EFI_ARCH}.efi.signed', d)
 }
 addtask sign after do_compile before do_install
 

@@ -71,8 +71,10 @@ do_install_append_class-target() {
     # Create a boot entry for Automatic Certificate Provision. This is required because
     # certain hardware, e.g, Intel NUC5i3MYHE, doedn't support to display a
     # customized BIOS boot option used to launch LockDown.efi.
-    [ x"${UEFI_SB}" = x"1" ] && ! grep -q "Automatic Certificate Provision" $cfg &&
-        cat >> $cfg <<_EOF
+    # Note that shim loader supports to automatically launch LockDown.efi.
+    [ x"${UEFI_SB}" = x"1" ] && [ x"${MOK_SB}" != x"1" ] &&
+        ! grep -q "Automatic Certificate Provision" $cfg &&
+            cat >> $cfg <<_EOF
 
 menuentry 'Automatic Certificate Provision' {
     chainloader /EFI/BOOT/LockDown.efi
