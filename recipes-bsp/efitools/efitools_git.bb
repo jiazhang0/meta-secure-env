@@ -14,7 +14,7 @@ SRC_URI_append = " \
 
 COMPATIBLE_HOST = '(i.86|x86_64).*-linux'
 
-inherit user-key-store
+inherit user-key-store deploy
 
 # The generated native binaries are used during native and target build
 DEPENDS_append = " ${BPN}-native gnu-efi openssl"
@@ -71,3 +71,10 @@ do_install_append() {
     install -d ${D}${EFI_BOOT_PATH}
     install -m 0755 ${D}${datadir}/efitools/efi/LockDown.efi ${D}${EFI_BOOT_PATH}
 }
+
+do_deploy() {
+    install -d ${DEPLOYDIR}
+
+    install -m 0600 ${D}${EFI_BOOT_PATH}/LockDown.efi "${DEPLOYDIR}"
+}
+addtask deploy after do_install before do_build
