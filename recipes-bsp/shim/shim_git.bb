@@ -77,8 +77,8 @@ addtask prepare_signing_keys after do_check_user_keys before do_compile
 
 python do_sign() {
     shim_sb_sign('${S}/shim${EFI_ARCH}.efi', '${B}/shim${EFI_ARCH}.efi.signed', d)
-    shim_sb_sign('${S}/mm${EFI_ARCH}.efi', '${B}/mm${EFI_ARCH}.efi.signed', d)
-    shim_sb_sign('${S}/fb${EFI_ARCH}.efi', '${B}/fb${EFI_ARCH}.efi.signed', d)
+    sb_sign('${S}/mm${EFI_ARCH}.efi', '${B}/mm${EFI_ARCH}.efi.signed', d)
+    sb_sign('${S}/fb${EFI_ARCH}.efi', '${B}/fb${EFI_ARCH}.efi.signed', d)
 }
 addtask sign after do_compile before do_install
 
