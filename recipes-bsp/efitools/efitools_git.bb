@@ -9,6 +9,7 @@ SRC_URI_append = " \
     file://LockDown-show-the-error-message-with-3-sec-timeout.patch \
     file://Makefile-do-not-build-signed-efi-image.patch \
     file://Build-DBX-by-default.patch \
+    file://LockDown-disable-the-entrance-into-BIOS-setup-to-re-.patch \
 "
 
 COMPATIBLE_HOST = '(i.86|x86_64).*-linux'
