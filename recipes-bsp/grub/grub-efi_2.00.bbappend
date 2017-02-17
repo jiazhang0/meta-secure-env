@@ -16,10 +16,11 @@ SRC_URI += " \
     file://chainloader-Don-t-check-empty-section-in-file-like-..patch \
     file://chainloader-Actually-find-the-relocations-correctly-.patch \
     file://Fix-32-bit-build-failures.patch \
+    file://Grub-get-and-set-efi-variables.patch \
     file://grub.cfg \
 "
 
-GRUB_BUILDIN_append = " chain"
+GRUB_BUILDIN_append = " chain ${@'efivar' if d.getVar('UEFI_SB', True) == '1' else ''}"
 
 # For efi_call_foo and efi_shim_exit
 CFLAGS_append = " -fno-toplevel-reorder"
