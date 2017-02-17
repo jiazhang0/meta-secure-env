@@ -14,8 +14,14 @@ S = "${WORKDIR}"
 ALLOW_EMPTY_${PN} = "1"
 
 PACKAGES =+ " \
+             ${PN}-rpm-pubkey \
              ${PN}-ima-pubkey \
             "
+
+# For RPM verification
+RPM_KEY_DIR = "${sysconfdir}/pki/rpm-gpg"
+FILES_${PN}-rpm-pubkey = "${RPM_KEY_DIR}/RPM-GPG-KEY-*"
+CONFFILES_${PN}-rpm-pubkey = "${RPM_KEY_DIR}/RPM-GPG-KEY-*"
 
 # Note IMA private key is not available if user key signing model used.
 PACKAGES_DYNAMIC += "${PN}-ima-privkey"
@@ -41,6 +47,14 @@ python () {
 }
 
 do_install() {
+    install -d "${D}${RPM_KEY_DIR}"
+
+    for f in `ls ${WORKDIR}/RPM-GPG-KEY-*`; do
+        [ ! -f "$f" ] && continue
+
+        install -m 0400 "${WORKDIR}/$f" "${D}${RPM_KEY_DIR}"
+    done
+
     src_dir="${@uks_ima_keys_dir(d)}"
 
     install -d "${D}${KEY_DIR}"
@@ -49,4 +63,24 @@ do_install() {
     if [ "${@uks_signing_model(d)}" = "sample" ]; then
         install -m 400 "$src_dir/ima_privkey.pem" "${D}${IMA_PRIV_KEY}"
     fi
+}
+
+pkg_postinst_${PN}-rpm-pubkey() {
+    [ -n "$D" ] && return
+
+    keydir="${RPM_KEY_DIR}"
+
+    [ ! -d "$keydir" ] && mkdir -p "$keydir"
+
+    # XXX: only import the new key
+    for f in `ls $keydir/RPM-GPG-KEY-*`; do
+        keyfile="$keydir/$f"
+
+        [ ! -f "$keyfile" ] && continue
+
+        ! rpm --import "$keyfile" && {
+            echo "Unable to import the public key $f"
+            exit 1
+        }
+    done
 }

@@ -26,7 +26,7 @@
 # initramfs assumed.
 ROOT_DIR="${1}"
 
-SECURITYFS_DIR=${ROOT_DIR}/sys/kernel/security
+SECURITYFS_DIR="${ROOT_DIR}/sys/kernel/security"
 
 # The policy files are always placed in initramfs
 IMA_POLICY=/etc/ima_policy
@@ -82,14 +82,16 @@ function trap_handler
     fi
 
     [ $SECURITYFS_MOUNTED -eq 1 ] &&
-        umount "$SECURITYFS_DIR" 2>${ROOT_DIR}/dev/null
+        umount "$SECURITYFS_DIR" 2>"${ROOT_DIR}/dev/null"
 }
 
 trap "trap_handler $?" SIGINT EXIT
 
-if ! grep -q securityfs ${ROOT_DIR}/proc/mounts; then
-   ! mount -t securityfs none "$SECURITYFS_DIR" 2>${ROOT_DIR}/dev/null &&
-       print_error "Unable to mount securityfs filesystem" && exit 1
+if ! grep -q securityfs "${ROOT_DIR}/proc/mounts"; then
+   ! mount -t securityfs none "$SECURITYFS_DIR" 2>"${ROOT_DIR}/dev/null" && {
+       print_error "Unable to mount securityfs filesystem"
+       exit 1
+   }
    SECURITYFS_MOUNTED=1
    securityfs_dir="$SECURITYFS_DIR"
 else
@@ -104,27 +106,33 @@ fi
 [ ! -d "$securityfs_dir/ima" ] &&
     print_info "IMA is not enabled. Exiting ..." && exit 2
 
-if grep -q 'ima_appraise=off' ${ROOT_DIR}/proc/cmdline; then
-    print_info "Skip to load the public key for IMA appraise"
+if grep -q "ima_appraise=off" "${ROOT_DIR}/proc/cmdline"; then
+    print_info "Skip to load the public key for IMA appraisal"
 else
     keyring_id=`keyctl newring _ima @u`
 
     for key in /etc/keys/pubkey_evm*.pem; do
-        if ! evmctl import --rsa $key $keyring_id >${ROOT_DIR}/dev/null; then
-            print_critical "Unable to load the public key $key for IMA appraise"
+        if ! evmctl import --rsa "$key" $keyring_id >"${ROOT_DIR}/dev/null"; then
+            print_critical "Unable to load the public key $key for IMA appraisal"
         else
             PUBKEY_LOADED=1
-            print_verbose "The public key $key loaded for IMA appraise"
+            print_verbose "The public key $key loaded for IMA appraisal"
         fi
     done
 
-    [ $PUBKEY_LOADED -ne 1 ] && print_warning "No public key loaded" && exit 3
+    [ $PUBKEY_LOADED -ne 1 ] && {
+        print_warning "No public key loaded"
+        exit 3
+    }
 fi
 
 # Attempt to load the default policy.
 [ ! -f "${IMA_POLICY}" ] && IMA_POLICY="${IMA_POLICY}.default"
 
-[ ! -f "${IMA_POLICY}" ] && print_warning "No IMA policy file defined" && exit 4
+[ ! -f "${IMA_POLICY}" ] && {
+    print_warning "No IMA policy file defined"
+    exit 4
+}
 
 cat "${IMA_POLICY}" > "$securityfs_dir/ima/policy" && {
     print_info "IMA policy ${IMA_POLICY} loaded"
