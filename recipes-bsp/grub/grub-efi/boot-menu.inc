@@ -3,5 +3,6 @@
 # the linux command.
 
 menuentry "Sample EFI boot" {
+    savedefault
     chainloader /bzImage root=/dev/sda2 ro rootwait initrd=/initrd
 }
