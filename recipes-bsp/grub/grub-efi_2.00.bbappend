@@ -47,6 +47,14 @@ python __anonymous () {
     d.setVar("GRUB_IMAGE", grubimage)
 }
 
+do_compile_append_class-native() {
+    make grub-editenv
+}
+
+do_install_append_class-native() {
+    install -m 0755 grub-editenv "${D}${bindir}"
+}
+
 do_install_append_class-target() {
     local cfg="${WORKDIR}/grub.cfg"
 
@@ -84,6 +92,9 @@ _EOF
 
     install -d ${D}${EFI_BOOT_PATH}
     install -m 0600 $cfg "${D}${EFI_BOOT_PATH}/grub.cfg"
+
+    # Create the initial environment block with empty item.
+    grub-editenv "${D}${EFI_BOOT_PATH}/grubenv" create
 }
 
 python do_sign_class-target() {
