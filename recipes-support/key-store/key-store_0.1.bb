@@ -49,19 +49,25 @@ python () {
 do_install() {
     install -d "${D}${RPM_KEY_DIR}"
 
-    for f in `ls ${WORKDIR}/RPM-GPG-KEY-*`; do
+    for f in `ls ${WORKDIR}/RPM-GPG-KEY-* 2>/dev/null`; do
         [ ! -f "$f" ] && continue
 
-        install -m 0400 "${WORKDIR}/$f" "${D}${RPM_KEY_DIR}"
+        install -m 0644 "$f" "${D}${RPM_KEY_DIR}"
     done
 
-    src_dir="${@uks_ima_keys_dir(d)}"
+    key_dir="${@uks_rpm_keys_dir(d)}"
+    for f in `ls $key_dir/RPM-GPG-KEY-* 2>/dev/null`; do
+        [ ! -f "$f" ] && continue
+
+        install -m 0644 "$f" "${D}${RPM_KEY_DIR}"
+    done
 
     install -d "${D}${KEY_DIR}"
-    install -m 644 "$src_dir/ima_pubkey.pem" "${D}${IMA_PUB_KEY}"
+    key_dir="${@uks_ima_keys_dir(d)}"
+    install -m 0644 "$key_dir/ima_pubkey.pem" "${D}${IMA_PUB_KEY}"
 
     if [ "${@uks_signing_model(d)}" = "sample" ]; then
-        install -m 400 "$src_dir/ima_privkey.pem" "${D}${IMA_PRIV_KEY}"
+        install -m 0400 "$key_dir/ima_privkey.pem" "${D}${IMA_PRIV_KEY}"
     fi
 }
 
