@@ -318,8 +318,8 @@ Manually Sign Kernel Image
 --------------------------
 Refer to the cognominal section in feature/uefi-secure-boot/README.
 
-Work Flow
-=========
+Work Flow For The First Boot
+============================
 
 - Build a project with this template and feature/uefi-secure-boot
 
@@ -327,19 +327,19 @@ Work Flow
 
 - Boot up the target board
 
-- Enter to BIOS setup and remove the default certificates
+- Enter to BIOS setup and remove the enrolled certificates
+  * It is recommended to turn on UEFI secure boot option if allowed.
 
-- Boot to "Automatic Certificate Provision"
+- Launch a reboot via ctrl + alt + del
+  * Otherwise, a misleading error message about the verification failure
+  will be displayed.
 
-- Enable UEFI secure boot again in BIOS setup
+- Automatically boot to "Automatic Certificate Provision"
 
-- Manually reset the board again*
+- (Optional) Enter into BIOS setup to turn on UEFI secure boot option
 
 - Boot to the system with the protection provided by UEFI secure boot and
   MOK secure boot
-
-* Otherwise, a misleading error message about the verification failure will
-  be displayed.
 
 Known Issues
 ============

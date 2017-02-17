@@ -74,37 +74,42 @@ Automatic Certificate Provision
 -------------------------------
 The certificate provision is required to enable UEFI secure boot. By default,
 the target may be provisioned with the default certificates enrolled during the
-manufacture. In order to use the sample keys or the self-owned keys, please
-follow up the instructions below.
+manufacture.
 
-Create a boot entry in grub boot menu
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The build system will automatically create such a boot entry in grub boot
-menu without the necessity of manual creation.
+In order to use the bootloader and kernel signed by the sample or self-owned
+key to boot up the system, refer to the instructions listed in the section
+"Work Flow For The First Boot".
 
-menuentry 'Automatic Certificate Provision' {
-    chainloader /EFI/BOOT/LockDown.efi
-}
-
-Remove the default certificates in BIOS setup
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Remove the enrolled certificates in BIOS setup
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The LockDown.efi application is used to run the provision. However,
 LockDown.efi cannot be launched if UEFI secure boot is already enabled. In
 addition, the enrolled certificates may be not the ones the user hopes to use.
 
-In order to provision UEFI secure boot with the sample keys or self-owned keys,
-the user needs to remove the default certificates in BIOS setup. The detailed
-steps may vary between the boards.
+The provisioned certificates can be removed in BIOS setup. The detailed steps
+may vary between the boards. Refer to BIOS manual for the details.
 
-Select "Automatic Certificate Provision"
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When selecting this entry in grub boot menu, LockDown.efi will be launched and
-automatically provision UEFI secure boot with the variants of PK.pem, KEK.pem,
-DB.pem and DBX/*.
+Launch the automatic provision
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Lockdown.efi will automatically provision UEFI secure boot after removing the
+the provisioned certificates in BIOS setup. More specifically, the PK, KEK,
+DB and DBX (if any) will be enrolled and begin to take affect after a reboot.
 
-Enable UEFI secure boot
-~~~~~~~~~~~~~~~~~~~~~~~
-LockDown.efi will enforce entering into BIOS setup for the next boot in order
-to conveniently allow the user to re-enable UEFI secure boot.
+Turn on UEFI secure boot option
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If UEFI secure boot option is turned off, the user has to enter into BIOS setup
+after provision to manually turn on the option.
+
+If the option is already enabled when removing the enrolled certificates in
+BIOS setup, this step can be ignored.
+
+Re-trigger automatic provision
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+By default, the "Automatica Certificate Provision" option is hidden in boot
+menu for the first boot. If the user would like to clear the certificates
+provisioned by the "Automatica Certificate Provision" option in BIOS setup, this
+hidden boot option will be shown in boot menu, allowing to re-trgger it when
+necessary.
 
 Verification
 ============
@@ -189,8 +194,8 @@ boot can provide such a signed shim loader with some limits.
 
 See feature/mok-secure-boot for the details about MOK secure boot and shim.
 
-Work Flow
-=========
+Work Flow For The First Boot
+============================
 
 Assuming the user uses UEFI secure boot only.
 
@@ -200,18 +205,18 @@ Assuming the user uses UEFI secure boot only.
 
 - Boot up the target board
 
-- Enter to BIOS setup and remove the default certificates
+- Enter to BIOS setup and remove the enrolled certificates
+  * It is recommended to turn on UEFI secure boot option if allowed.
 
-- Boot to "Automatic Certificate Provision"
+- Launch a reboot via ctrl + alt + del
+  * Otherwise, a misleading error message about the verification failure
+  will be displayed.
 
-- Enable UEFI secure boot again in BIOS setup
+- Automatically boot to "Automatic Certificate Provision"
 
-- Manually reset the board again*
+- (Optional) Enter into BIOS setup to turn on UEFI secure boot option
 
 - Boot to the system with the protection provided by UEFI secure boot
-
-* Otherwise, a misleading error message about the verification failure will
-  be displayed.
 
 Notes
 =====
