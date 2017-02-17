@@ -19,6 +19,9 @@ def uks_signing_model(d):
 def uks_ima_keys_dir(d):
     return d.getVar('IMA_KEYS_DIR', True) + '/'
 
+def uks_rpm_keys_dir(d):
+    return d.getVar('RPM_KEYS_DIR', True) + '/'
+
 def sign_efi_image(key, cert, input, output, d):
     import bb.process
 
@@ -354,10 +357,13 @@ python do_check_user_keys_class-target () {
     vprint('  MOK_SB_KEYS_DIR: ${MOK_SB_KEYS_DIR}', d)
     vprint('  UEFI_SB_KEYS_DIR: ${UEFI_SB_KEYS_DIR}', d)
     vprint('  IMA_KEYS_DIR: ${IMA_KEYS_DIR}', d)
+    vprint('  RPM_KEYS_DIR: ${RPM_KEYS_DIR}', d)
     vprint('  SAMPLE_MOK_SB_KEYS_DIR: ${SAMPLE_MOK_SB_KEYS_DIR}', d)
     vprint('  SAMPLE_UEFI_SB_KEYS_DIR: ${SAMPLE_UEFI_SB_KEYS_DIR}', d)
     vprint('  SAMPLE_IMA_KEYS_DIR: ${SAMPLE_IMA_KEYS_DIR}', d)
+    vprint('  SAMPLE_RPM_KEYS_DIR: ${SAMPLE_RPM_KEYS_DIR}', d)
 
+    # XXX: the user key for rpm signing is necessary but not required.
     for _ in ('UEFI_SB', 'MOK_SB', 'IMA'):
         # Intend to use user key?
         if (d.getVar(_, True) != "1") or ("${SIGNING_MODEL}" != "user"):

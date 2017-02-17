@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2016 Wind River Systems, Inc.
+# Copyright (C) 2016-2017 Wind River Systems, Inc.
 #
 
 FILESEXTRAPATHS_prepend := "${THISDIR}/grub-efi:"
@@ -77,7 +77,6 @@ do_install_append_class-target() {
     install -d "${D}${EFI_BOOT_PATH}"
     install -m 0600 "${WORKDIR}/grub-efi.cfg" "${D}${EFI_BOOT_PATH}/grub.cfg"
     install -m 0600 "$menu" "${D}${EFI_BOOT_PATH}"
-    install -m 0600 "${WORKDIR}/boot-menu.inc" "${D}${EFI_BOOT_PATH}"
     [ x"${UEFI_SB}" = x"1" ] &&
         install -m 0600 "${WORKDIR}/efi-secure-boot.inc" "${D}${EFI_BOOT_PATH}"
 
@@ -95,10 +94,10 @@ python do_sign() {
 addtask sign after do_install before do_deploy do_package
 
 do_deploy_append_class-target() {
-    install -d ${DEPLOYDIR}/efi-unsigned
+    install -d "${DEPLOYDIR}/efi-unsigned"
 
-    install -m 0600 ${B}/${GRUB_IMAGE} ${DEPLOYDIR}/efi-unsigned
-    cp -af ${D}${EFI_BOOT_PATH}/${GRUB_TARGET}-efi ${DEPLOYDIR}/efi-unsigned
+    install -m 0600 "${B}/${GRUB_IMAGE}" "${DEPLOYDIR}/efi-unsigned"
+    cp -af "${D}${EFI_BOOT_PATH}/${GRUB_TARGET}-efi" "${DEPLOYDIR}/efi-unsigned"
 }
 
 CONFFILES_${PN} += " \
