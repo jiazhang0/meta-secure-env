@@ -9,9 +9,6 @@ include packagegroup-ima.inc
 RDEPENDS_${PN} += " \
     util-linux-mount \
     util-linux-umount \
-    coreutils \
-    grep \
     gawk \
-    keyutils \
     ima-policy \
 "
