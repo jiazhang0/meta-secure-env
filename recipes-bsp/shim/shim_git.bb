@@ -25,13 +25,12 @@ SRC_URI = " \
         file://Fix-for-the-cross-compilation.patch \
         file://Fix-signing-failure-due-to-not-finding-certificate.patch \
         file://Prevent-from-removing-intermediate-.efi.patch \
-        file://shim-fix-the-handling-EFI_SECURITY_VIOLATION.patch \
         file://Use-sbsign-to-sign-MokManager-and-fallback.patch \
         file://Fix-the-world-build-failure-due-to-the-missing-rule-.patch \
         file://Don-t-enforce-to-use-gnu89-standard.patch \
 	file://Makefile-do-not-sign-the-efi-file.patch \
 "
-SRCREV = "431d893b41c53f6a022031ca0cc66fd298e0e472"
+SRCREV = "9f2c83e60e0758c3db387eebaed3f306ad6214a8"
 PV = "0.9+git${SRCPV}"
 
 COMPATIBLE_HOST = '(i.86|x86_64).*-linux'
