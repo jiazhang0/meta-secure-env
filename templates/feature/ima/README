@@ -97,18 +97,18 @@ is allowed to define the custom external IMA policy.
 The custom external IMA policy file is eventually installed to /etc/ima_policy
 in initramfs.
 
-Import IMA Public & Private Key
-===============================
+IMA Public & Private Key
+========================
 
 The private key come in two flavors; one used by the installer to sign all
 regular files in rootfs and one used by RPM to re-sign the executable, shared
 library, kernel module and firmware during RPM installation. Correspondingly,
 the public key is used to verify the IMA signature signed by the private key.
 
-In addition, initramfs is a good place to import the IMA public key likewise.
-
 They are installed to /etc/keys/pubkey_evm.pem and
 /etc/keys/privkey_evm.pem correspondingly.
+
+In addition, initramfs is a good place to import the IMA public key likewise.
 
 The default IMA public & private key
 ------------------------------------
@@ -130,6 +130,11 @@ allowed to define the use them during the installation.
 
 Refer to feature/user-key-store-test for the details about how to generate/use
 the keys owned by the user.
+
+Note:
+- The private key specified by IMA_PRIVKEY variable is not installed for safety,
+unless the user intends to copy it to rootfs.
+- The sample private key is installed to rootfs if used.
 
 Installer command line
 ======================
