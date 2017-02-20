@@ -34,8 +34,6 @@ IMA_POLICY=/etc/ima_policy
 PUBKEY_LOADED=0
 SECURITYFS_MOUNTED=0
 
-export PATH="${ROOT_DIR}/usr/sbin:${ROOT_DIR}/usr/bin:${ROOT_DIR}/sbin:${ROOT_DIR}/bin:${PATH}"
-
 function print_critical
 {
     printf "\033[1;35m"
@@ -135,7 +133,6 @@ fi
 }
 
 cat "${IMA_POLICY}" > "$securityfs_dir/ima/policy" && {
-    print_info "IMA policy ${IMA_POLICY} loaded"
     exit 0
 } || {
     print_critical "Unable to load the IMA policy ${IMA_POLICY}"

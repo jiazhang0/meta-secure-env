@@ -1,7 +1,7 @@
-From cc9135d8beb9940993e5dc4b2238ebcf75161d49 Mon Sep 17 00:00:00 2001
+From 137e311af149ce4fb46194fefacdda63485ae122 Mon Sep 17 00:00:00 2001
 From: Lans Zhang <jia.zhang@windriver.com>
-Date: Thu, 22 Sep 2016 11:11:59 +0800
-Subject: [PATCH] shim: allow to verify sha1 digest for Authenticode
+Date: Sun, 19 Feb 2017 11:14:36 +0800
+Subject: [PATCH 01/11] shim: allow to verify sha1 digest for Authenticode
 
 Upstream-Status: Pending
 
@@ -14,7 +14,7 @@ Signed-off-by: Lans Zhang <jia.zhang@windriver.com>
  1 file changed, 33 insertions(+), 13 deletions(-)
 
 diff --git a/shim.c b/shim.c
-index c69961b..8d9d717 100644
+index 1902da3..0cfdace 100644
 --- a/shim.c
 +++ b/shim.c
 @@ -430,7 +430,8 @@ static BOOLEAN verify_eku(UINT8 *Cert, UINTN CertSize)
@@ -56,30 +56,30 @@ index c69961b..8d9d717 100644
  
 @@ -573,7 +574,8 @@ static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
  				DATA_FOUND)
- 		return EFI_ACCESS_DENIED;
+ 		return EFI_SECURITY_VIOLATION;
  	if (cert && check_db_cert_in_ram(dbx, vendor_dbx_size, cert,
 -					 sha256hash) == DATA_FOUND)
 +					 sha256hash, SHA256_DIGEST_SIZE) ==
-+					 DATA_FOUND)
- 		return EFI_ACCESS_DENIED;
++					DATA_FOUND)
+ 		return EFI_SECURITY_VIOLATION;
  
  	if (check_db_hash(L"dbx", secure_var, sha256hash, SHA256_DIGEST_SIZE,
 @@ -582,14 +584,14 @@ static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
  	if (check_db_hash(L"dbx", secure_var, sha1hash, SHA1_DIGEST_SIZE,
  			  EFI_CERT_SHA1_GUID) == DATA_FOUND)
- 		return EFI_ACCESS_DENIED;
+ 		return EFI_SECURITY_VIOLATION;
 -	if (cert && check_db_cert(L"dbx", secure_var, cert, sha256hash) ==
 +	if (cert && check_db_cert(L"dbx", secure_var, cert, sha256hash, SHA256_DIGEST_SIZE) ==
  				DATA_FOUND)
- 		return EFI_ACCESS_DENIED;
+ 		return EFI_SECURITY_VIOLATION;
  	if (check_db_hash(L"MokListX", shim_var, sha256hash, SHA256_DIGEST_SIZE,
  			  EFI_CERT_SHA256_GUID) == DATA_FOUND) {
- 		return EFI_ACCESS_DENIED;
+ 		return EFI_SECURITY_VIOLATION;
  	}
 -	if (cert && check_db_cert(L"MokListX", shim_var, cert, sha256hash) ==
 +	if (cert && check_db_cert(L"MokListX", shim_var, cert, sha256hash, SHA256_DIGEST_SIZE) ==
  				DATA_FOUND) {
- 		return EFI_ACCESS_DENIED;
+ 		return EFI_SECURITY_VIOLATION;
  	}
 @@ -624,7 +626,7 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
  			update_verification_method(VERIFIED_BY_HASH);
@@ -99,7 +99,7 @@ index c69961b..8d9d717 100644
  				DATA_FOUND) {
  		verification_method = VERIFIED_BY_CERT;
  		update_verification_method(VERIFIED_BY_CERT);
-@@ -1014,25 +1016,43 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
+@@ -1022,25 +1024,43 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
  		/*
  		 * Check against the shim build key
  		 */
@@ -148,5 +148,5 @@ index c69961b..8d9d717 100644
  	}
  
 -- 
-1.9.1
+2.7.4
 

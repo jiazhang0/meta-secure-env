@@ -29,7 +29,7 @@ python package_ima_hook() {
 
         pkgdestpkg = os.path.join(pkgdest, pkg)
 
-        cmd = 'evmctl ima_sign --rsa --sigfile --key ${IMA_KEYS_DIR}/ima_privkey.pem '
+        cmd = 'evmctl ima_sign --rsa --hashalgo sha256 --sigfile --key ${IMA_KEYS_DIR}/ima_privkey.pem '
         sig_list = []
         pkg_sig_list = []
 
@@ -110,6 +110,13 @@ if [ -z "$D" ]; then
             continue
         }
 
+        # If the filesystem doesn't support xattr, skip the following steps.
+        res=`"$setfattr_bin" -x security.ima "$f" 2>&1 | grep "Operation not supported$"`
+        [ x"$res" != x"" ] && {
+            true
+            break
+        }
+
         if [ $ima_resign -eq 0 ]; then
             cond_print "Setting up security.ima for $f ..."
 
@@ -121,7 +128,7 @@ if [ -z "$D" ]; then
         else
             cond_print "IMA signing for $f ..."
 
-            ! "$evmctl_bin" ima_sign --rsa "$f" && {
+            ! "$evmctl_bin" ima_sign --hashalgo sha256 --rsa "$f" && {
                 err=$?
                 cond_print "Unable to sign $f (err: $err)"
                 exit 1
