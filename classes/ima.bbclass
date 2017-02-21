@@ -122,7 +122,7 @@ if [ -z "$D" ]; then
         if [ $ima_resign -eq 0 ]; then
             cond_print "Setting up security.ima for $f ..."
 
-            ! "$setfattr_bin" -n security.ima -v "0s$sig" "$f" && {
+            "$setfattr_bin" -n security.ima -v "0s$sig" "$f" || {
                 err=$?
                 cond_print "Unable to set up security.ima for $f (err: $err)"
                 exit 1
@@ -130,16 +130,13 @@ if [ -z "$D" ]; then
         else
             cond_print "IMA signing for $f ..."
 
-            ! "$evmctl_bin" ima_sign --hashalgo sha256 --rsa "$f" && {
+            "$evmctl_bin" ima_sign --hashalgo sha256 --rsa "$f" || {
                 err=$?
                 cond_print "Unable to sign $f (err: $err)"
                 exit 1
             }
         fi
     done
-
-    err=$?
-    cond_print "Set IMA signature completed (result: $err)"
 fi
 
 '''
