@@ -72,21 +72,19 @@ do_install() {
 }
 
 pkg_postinst_${PN}-rpm-pubkey() {
-    [ -n "$D" ] && return
+    if [ -z "$D" ]; then
+        keydir="${RPM_KEY_DIR}"
 
-    keydir="${RPM_KEY_DIR}"
+        [ ! -d "$keydir" ] && mkdir -p "$keydir"
 
-    [ ! -d "$keydir" ] && mkdir -p "$keydir"
+        # XXX: only import the new key
+        for keyfile in `ls $keydir/RPM-GPG-KEY-*`; do
+            [ ! -f "$keyfile" ] && continue
 
-    # XXX: only import the new key
-    for f in `ls $keydir/RPM-GPG-KEY-*`; do
-        keyfile="$keydir/$f"
-
-        [ ! -f "$keyfile" ] && continue
-
-        ! rpm --import "$keyfile" && {
-            echo "Unable to import the public key $f"
-            exit 1
-        }
-    done
+            ! rpm --import "$keyfile" && {
+                echo "Unable to import the public key $keyfile"
+                exit 1
+            }
+        done
+    fi
 }
