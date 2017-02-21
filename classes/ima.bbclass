@@ -19,7 +19,7 @@ python package_ima_hook() {
 
     pkg_blacklist = ('dbg', 'dev', 'doc', 'locale', 'staticdev')
 
-    import base64, pipes
+    import base64, pipes, stat
 
     for pkg in packages.split():
         if (pkg.split('-')[-1] in pkg_blacklist) is True:
@@ -34,6 +34,14 @@ python package_ima_hook() {
         pkg_sig_list = []
 
         for _ in pkgfiles[pkg]:
+            # Ignore the symbol links.
+            if os.path.islink(_):
+                continue
+
+            # IMA appraisal is only applied to the regular file.
+            if not stat.S_ISREG(os.stat(_)[stat.ST_MODE]):
+                continue
+
             bb.note("Preparing to sign %s ..." % _)
 
             sh_name = pipes.quote(_)
@@ -104,16 +112,10 @@ if [ -z "$D" ]; then
 
         f="$token"
 
-        # IMA appraisal is only applied to the regular file
-        [ ! -f "$f" ] && {
-            true
-            continue
-        }
-
         # If the filesystem doesn't support xattr, skip the following steps.
         res=`"$setfattr_bin" -x security.ima "$f" 2>&1 | grep "Operation not supported$"`
         [ x"$res" != x"" ] && {
-            true
+            cond_print "security.ima error: $res"
             break
         }
 
@@ -135,6 +137,9 @@ if [ -z "$D" ]; then
             }
         fi
     done
+
+    err=$?
+    cond_print "Set IMA signature completed (result: $err)"
 fi
 
 '''
