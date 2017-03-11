@@ -23,6 +23,7 @@ SRC_URI += " \
     file://Grub-get-and-set-efi-variables.patch \
     file://grub-efi.cfg \
     file://boot-menu.inc \
+    file://serial-redirect-control-x-fix.patch \
     ${EXTRA_SRC_URI} \
 "
 
