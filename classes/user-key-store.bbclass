@@ -69,22 +69,24 @@ def mok_sb_keys_dir(d):
     return d.getVar('MOK_SB_KEYS_DIR', True) + '/'
 
 def sb_sign(input, output, d):
-    if d.getVar('UEFI_SB', True) == '1':
-        if uks_signing_model(d) == 'sample' or uks_signing_model(d) == 'user':
-            # deal with MOK_SB firstly, as MOK_SB means MOK_SB | UEFI_SB
-            # On this scenario, bootloader is verified by shim_cert.pem
-            if d.getVar('MOK_SB', True) == '1':
-                mok_sb_sign(input, output, d)
-            # UEFI_SB is defined, but MOK_SB is not defined
-            # On this scenario, shim is not used, and DB.pem is used to
-            # verify bootloader directly.
-            else:
-                uefi_sb_sign(input, output, d)
-        elif uks_signing_model(d) == 'edss':
-            edss_sign_efi_image(input, output, d)
+    if d.getVar('UEFI_SB', True) != '1':
+        return
+
+    if uks_signing_model(d) in ('sample', 'user'):
+        # Deal with MOK_SB firstly, as MOK_SB implies UEFI_SB == 1.
+        # On this scenario, bootloader is verified by shim_cert.pem
+        if d.getVar('MOK_SB', True) == '1':
+            mok_sb_sign(input, output, d)
+        # UEFI_SB is defined, but MOK_SB is not defined
+        # On this scenario, shim is not used, and DB.pem is used to
+        # verify bootloader directly.
+        else:
+            uefi_sb_sign(input, output, d)
+    elif uks_signing_model(d) == 'edss':
+        edss_sign_efi_image(input, output, d)
 
 def shim_sb_sign(input, output, d):
-    if uks_signing_model(d) == 'sample' or uks_signing_model(d) == 'user':
+    if uks_signing_model(d) in ('sample', 'user'):
         uefi_sb_sign(input, output, d)
     elif uks_signing_model(d) == 'edss':
         edss_sign_efi_image(input, output, d)
@@ -102,9 +104,11 @@ def check_mok_sb_user_keys(d):
             return False
 
 def mok_sb_sign(input, output, d):
-    if d.getVar('MOK_SB', True) == '1':
-        _ = mok_sb_keys_dir(d)
-        sign_efi_image(_ + 'shim_cert.key', _ + 'shim_cert.pem', input, output, d)
+    if d.getVar('MOK_SB', True) != '1':
+        return
+
+    _ = mok_sb_keys_dir(d)
+    sign_efi_image(_ + 'shim_cert.key', _ + 'shim_cert.pem', input, output, d)
 
 # Prepare signing keys for shim
 def shim_prepare_sb_keys(d):
