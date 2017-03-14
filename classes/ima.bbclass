@@ -52,7 +52,7 @@ python package_ima_hook() {
 
             with open(_ + '.sig', 'r') as f:
                 s = base64.b64encode(f.read()) + ':'
-                sig_list.append(s + os.sep + os.path.relpath(sh_name, pkgdestpkg))
+                sig_list.append(s + os.sep + os.path.relpath(_, pkgdestpkg))
 
             os.remove(_ + '.sig')
 
