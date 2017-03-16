@@ -19,7 +19,7 @@ SRCREV = "7234a763bf5c2f1821f168d8f50b3ed3f098d911"
 PV = "0.4.2+git${SRCPV}"
 
 DEPENDS += "tpm2.0-tss"
-RDEPENDS_${PN} += "libtss2 libtctisocket"
+RDEPENDS_${PN} += "libtss2 libtctisocket tpm2.0-tools"
 
 PARALLEL_MAKE = ""
 
