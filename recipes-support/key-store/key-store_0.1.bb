@@ -22,6 +22,7 @@ PACKAGES =+ " \
 RPM_KEY_DIR = "${sysconfdir}/pki/rpm-gpg"
 FILES_${PN}-rpm-pubkey = "${RPM_KEY_DIR}/RPM-GPG-KEY-*"
 CONFFILES_${PN}-rpm-pubkey = "${RPM_KEY_DIR}/RPM-GPG-KEY-*"
+RDEPENDS_${PN}-rpm-pubkey += "rpm"
 
 # Note IMA private key is not available if user key signing model used.
 PACKAGES_DYNAMIC += "${PN}-ima-privkey"
