@@ -3,16 +3,18 @@
 def import_gpg_key(d, path):
     import bb
     gpg_bin = d.getVar('GPG_BIN', True) or \
+              bb.utils.which(os.getenv('PATH'), "gpg2") or \
               bb.utils.which(os.getenv('PATH'), "gpg")
     cmd = '%s --import %s' % (gpg_bin, path)
     status, output = oe.utils.getstatusoutput(cmd)
     if status:
-        raise bb.build.FuncFailed('Failed to import gpg key (%s): %s' %
+        raise bb.build.FuncFailed('Failed to import gpg key (%s): %s' % \
                                   (path, output))
 
 def check_gpg_key(d, keyid):
     import bb
     gpg_bin = d.getVar('GPG_BIN', True) or \
+              bb.utils.which(os.getenv('PATH'), "gpg2") or \
               bb.utils.which(os.getenv('PATH'), "gpg")
     cmd = '%s --list-keys -a "%s"' % (gpg_bin, keyid)
     status, output = oe.utils.getstatusoutput(cmd)
