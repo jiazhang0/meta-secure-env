@@ -2,11 +2,11 @@
 Description=TPM 2.0 TCG Software Stack service
 After=syslog.target network.target
 ConditionPathExists=/dev/tpm0
-ConditionPathExistsGlob=/sys/class/tpm/tpm0/device/description
+ConditionPathExistsGlob=/sys/class/tpm/tpm0/@TPM_DESCRIPTION@
 
 [Service]
 Type=simple
-ExecStartPre=/bin/sh -c "fgrep 'TPM 2.0' /sys/class/tpm/tpm0/device/description"
+ExecStartPre=/bin/sh -c "fgrep '@FAMILY_MAJOR@' /sys/class/tpm/tpm0/@TPM_DESCRIPTION@"
 ExecStart=/usr/sbin/resourcemgr
 
 TimeoutSec=30s
