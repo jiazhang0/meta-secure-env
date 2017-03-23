@@ -10,13 +10,13 @@ persistent in TPM. \
 "
 SECTION = "devel"
 LICENSE = "BSD"
-LIC_FILES_CHKSUM = "file://${S}/LICENSE;md5=af9aa760caa1532b4f5c9874d4e8c753"
+LIC_FILES_CHKSUM = "file://${S}/LICENSE;md5=35c0ab29d291dbbd14d66fd95521237f"
 
 SRC_URI = " \
     git://github.com/WindRiver-OpenSourceLabs/cryptfs-tpm2.git \
 "
-SRCREV = "8e9e0af26ccf1d4de0a630b96581cb40b3e6908b"
-PV = "0.4.2+git${SRCPV}"
+SRCREV = "28adbea486ccfabc9d6d1f1e19554e5f33fb5d6f"
+PV = "0.4.4+git${SRCPV}"
 
 DEPENDS += "tpm2.0-tss"
 RDEPENDS_${PN} += "libtss2 libtctisocket tpm2.0-tools"
