@@ -114,10 +114,7 @@ if [ -z "$D" ]; then
 
         # If the filesystem doesn't support xattr, skip the following steps.
         res=`"$setfattr_bin" -x security.ima "$f" 2>&1 | grep "Operation not supported$"`
-        [ x"$res" != x"" ] && {
-            cond_print "security.ima error: $res"
-            break
-        }
+        [ x"$res" != x"" ] && break
 
         if [ $ima_resign -eq 0 ]; then
             cond_print "Setting up security.ima for $f ..."
