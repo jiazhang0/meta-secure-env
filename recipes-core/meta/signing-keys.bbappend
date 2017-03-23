@@ -52,4 +52,4 @@ python do_import_keys () {
 # so keys have been already imported when running sign_rpm
 addtask do_import_keys before do_export_public_keys
 
-do_import_keys[depends] = "gnupg-native:do_populate_sysroot"
+do_import_keys[depends] += "gnupg-native:do_populate_sysroot"
