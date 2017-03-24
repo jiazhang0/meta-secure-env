@@ -221,7 +221,7 @@ function open_luks_part_with_encrypted_passphrase
 
     while [ 1 ]; do
         # Unseal the passphrase
-        cryptfs-tpm2 -q unseal passphrase -P sha1 -o "$TMP_DIR/$PASSPHRASE" 2>/dev/null
+        cryptfs-tpm2 -q unseal passphrase -P auto -o "$TMP_DIR/$PASSPHRASE" 2>/dev/null
         local res=$?
 
         # Error code 200 indicates resourcemgr is not ready

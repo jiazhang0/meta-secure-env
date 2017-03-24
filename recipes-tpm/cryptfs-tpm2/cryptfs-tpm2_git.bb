@@ -15,7 +15,7 @@ LIC_FILES_CHKSUM = "file://${S}/LICENSE;md5=35c0ab29d291dbbd14d66fd95521237f"
 SRC_URI = " \
     git://github.com/WindRiver-OpenSourceLabs/cryptfs-tpm2.git \
 "
-SRCREV = "28adbea486ccfabc9d6d1f1e19554e5f33fb5d6f"
+SRCREV = "a88fde6920e3ccdddc38feb76e95e6cdb35c3749"
 PV = "0.4.4+git${SRCPV}"
 
 DEPENDS += "tpm2.0-tss"
