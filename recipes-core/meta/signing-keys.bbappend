@@ -1,5 +1,7 @@
 # Copyright (C) 2017 Wind River
 
+inherit rpm-keys
+
 def import_gpg_key(d, keyfile, gpg_path):
     import bb
     gpg_bin = d.getVar('GPG_BIN', True) or \
@@ -42,10 +44,15 @@ python do_import_keys () {
         if check_gpg_key(d, d.getVar("RPM_GPG_NAME", True)) is True:
             return
 
-        if d.getVar("RPM_GPG_PRIVKEY", True):
+        keys_dir = rpm_keys_dir(d)
+        # GPG private key is supposed to be in RPM_KEYS_DIR with the name
+        gpg_privkey = keys_dir + '/RPM-GPG-PRIVKEY-' + d.getVar('RPM_GPG_NAME', True)
+        if os.path.exists(gpg_privkey):
             # Import private key of the rpm signing key
-            import_gpg_key(d, d.getVar('RPM_GPG_PRIVKEY', True), \
-                           d.getVar('GPG_PATH', True))
+            import_gpg_key(d, gpg_privkey, d.getVar('GPG_PATH', True))
+        else:
+           raise bb.build.FuncFailed('ERROR: Unable to find private key for rpm signing ...' + \
+                   'Please make sure RPM-GPG-PRIVKEY-${RPM_GPG_NAME} is available under %s' % keys_dir)
 }
 
 # sign_rpm depends on do_export_public_keys in oe-core,
