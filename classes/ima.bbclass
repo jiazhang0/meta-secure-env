@@ -51,12 +51,12 @@ python package_ima_hook() {
                     (_, rc, res if res else ""))
 
             with open(_ + '.sig', 'r') as f:
-                s = base64.b64encode(f.read()) + ':'
+                s = base64.b64encode(f.read()) + '|'
                 sig_list.append(s + os.sep + os.path.relpath(_, pkgdestpkg))
 
             os.remove(_ + '.sig')
 
-        ima_sig_list = ' '.join(sig_list)
+        ima_sig_list = '&'.join(sig_list)
 
         # When the statically linked binary is updated, use the
         # dynamically linked one to resign or set. This situation
@@ -95,20 +95,21 @@ if [ -z "$D" ]; then
         [ $safe_echo = "1" ] && echo $1
     }
 
+    saved_IFS="$IFS"
+    IFS="&"
     for entry in $sig_list; do
-        old_IFS="$IFS"
-        IFS=":"
+        IFS="|"
 
         tokens=""
         for token in $entry; do
-            tokens="$tokens$token "
+            tokens="$tokens$token|"
         done
-
-        IFS="$old_IFS"
 
         for sig in $tokens; do
             break
         done
+
+        IFS="$saved_IFS"
 
         f="$token"
 
@@ -133,7 +134,11 @@ if [ -z "$D" ]; then
                 exit 1
             }
         fi
+
+        IFS="&"
     done
+
+    IFS="$saved_IFS"
 fi
 
 '''
