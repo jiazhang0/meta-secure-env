@@ -27,5 +27,5 @@ do_install_append () {
     install -d ${D}${systemd_unitdir}/system
     install -m 0644 ${WORKDIR}/tcsd.service ${D}${systemd_unitdir}/system
     sed -i 's:@TPM_CAPS@:${TPM_CAPS}:' ${D}${systemd_unitdir}/system/tcsd.service
-    sed -i 's:@FAMILY_MAJOR@:${FAMILY_MAJOR}:' ${D}${systemd_unitdir}/system/tcsd.service
+    sed -i 's/@FAMILY_MAJOR@/${FAMILY_MAJOR}/' ${D}${systemd_unitdir}/system/tcsd.service
 }
