@@ -22,8 +22,10 @@ python do_sign() {
     shutil.copy(kernel, '${B}/bzImage.unsigned')
 
     sb_sign(kernel, kernel, d)
+    uks_sel_sign(kernel, d)
 
     shutil.copyfile(kernel, '${D}/boot/bzImage-${KERNEL_RELEASE}')
+    shutil.copyfile(kernel + '.p7b', '${D}/boot/bzImage-${KERNEL_RELEASE}' + '.p7b')
 }
 addtask sign after do_install before do_package do_populate_sysroot do_deploy
 
@@ -48,8 +50,10 @@ python do_sign_kernel_initramfs() {
     shutil.copy(kernel_initramfs, '${B}/bzImage.initramfs.unsigned')
 
     sb_sign(kernel_initramfs, kernel_initramfs, d)
+    uks_sel_sign(kernel_initramfs, d)
 
     shutil.copyfile(kernel_initramfs, '${D}/boot/bzImage-initramfs-${MACHINE}.bin')
+    shutil.copyfile(kernel_initramfs + '.p7b', '${D}/boot/bzImage-initramfs-${MACHINE}.bin.p7b')
 }
 addtask sign_kernel_initramfs after do_bundle_initramfs before do_deploy
 
