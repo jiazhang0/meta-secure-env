@@ -103,9 +103,11 @@ do_install_append_class-target() {
 python do_sign_class-target() {
     _ = '${D}${EFI_BOOT_PATH}/${GRUB_IMAGE}'
     sb_sign(_, _, d)
+
+    uks_sel_sign('${D}${EFI_BOOT_PATH}/grub.cfg', d)
 }
 
-python do_sign() {
+fakeroot python do_sign() {
 }
 addtask sign after do_install before do_deploy do_package
 
