@@ -2,7 +2,7 @@
 # Copyright (C) 2016-2017 Wind River Systems, Inc.
 #
 
-DEPENDS_append_class-target = " sbsigntool-native"
+DEPENDS_append_class-target = " sbsigntool-native libsign-native"
 USER_KEY_SHOW_VERBOSE = "1"
 
 UEFI_SB = '${@bb.utils.contains("DISTRO_FEATURES", "uefi-secure-boot", "1", "0", d)}'
