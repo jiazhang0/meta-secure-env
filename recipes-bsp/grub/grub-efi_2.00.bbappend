@@ -24,6 +24,7 @@ SRC_URI += " \
     file://grub-efi.cfg \
     file://boot-menu.inc \
     file://serial-redirect-control-x-fix.patch \
+    file://mok2verify-support-to-verify-non-PE-file-with-PKCS-7.patch \
     ${EXTRA_SRC_URI} \
 "
 

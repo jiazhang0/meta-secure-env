@@ -1,0 +1,368 @@
+From a73471075f55ff790363cfc426a04ce18dcada1a Mon Sep 17 00:00:00 2001
+From: Lans Zhang <jia.zhang@windriver.com>
+Date: Thu, 16 Mar 2017 14:49:41 +0800
+Subject: [PATCH] mok2verify: support to verify non-PE file with PKCS#7
+ signature
+
+MOK2 Verify Protocol is designed to verify non-PE file which cannot be
+verified by the MOK verify protocol supplied by shim loader, such as grub
+configuration, initrd, grub modules and so on.
+
+Each file needs to have a .p7a PKCS#7 signature for verification. For
+more details about signature format and singing tool, refer to
+https://github.com/jiazhang0/SELoader and  https://github.com/jiazhang0/libsign
+
+Signed-off-by: Lans Zhang <jia.zhang@windriver.com>
+---
+ grub-core/Makefile.core.def    |   6 ++
+ grub-core/lib/efi/mok2verify.c | 139 +++++++++++++++++++++++++++++++++++++++++
+ grub-core/loader/i386/linux.c  |  72 +++++++++++++++++++++
+ grub-core/normal/main.c        |  11 ++++
+ include/grub/efi/mok2verify.h  |  39 ++++++++++++
+ 5 files changed, 267 insertions(+)
+ create mode 100644 grub-core/lib/efi/mok2verify.c
+ create mode 100644 include/grub/efi/mok2verify.h
+
+diff --git a/grub-core/Makefile.core.def b/grub-core/Makefile.core.def
+index e9e1483..8e72251 100644
+--- a/grub-core/Makefile.core.def
++++ b/grub-core/Makefile.core.def
+@@ -1434,6 +1434,12 @@ module = {
+ };
+ 
+ module = {
++  name = mok2verify;
++  efi = lib/efi/mok2verify.c;
++  enable = efi;
++};
++
++module = {
+   name = mmap;
+   common = mmap/mmap.c;
+   x86 = mmap/i386/uppermem.c;
+diff --git a/grub-core/lib/efi/mok2verify.c b/grub-core/lib/efi/mok2verify.c
+new file mode 100644
+index 0000000..e959073
+--- /dev/null
++++ b/grub-core/lib/efi/mok2verify.c
+@@ -0,0 +1,139 @@
++/* mok2verify.c - MOK2 Verify Protocol support
++ *
++ * BSD 2-clause "Simplified" License
++ *
++ * Copyright (c) 2017, Lans Zhang <jia.zhang@windriver.com>
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are met:
++ *
++ * * Redistributions of source code must retain the above copyright notice, this
++ *   list of conditions and the following disclaimer.
++ *
++ * * Redistributions in binary form must reproduce the above copyright notice,
++ *   this list of conditions and the following disclaimer in the documentation
++ *   and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
++ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
++ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
++ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++#include <grub/loader.h>
++#include <grub/file.h>
++#include <grub/err.h>
++#include <grub/misc.h>
++#include <grub/charset.h>
++#include <grub/types.h>
++#include <grub/env.h>
++#include <grub/mm.h>
++#include <grub/efi/api.h>
++#include <grub/efi/efi.h>
++#include <grub/efi/mok2verify.h>
++
++GRUB_MOD_LICENSE ("GPLv2+");
++
++#define EFI_MOK2_VERIFY_PROTOCOL_GUID	\
++  { 0x4eda73ad, 0x07aa, 0x4b7a, \
++    { 0xa1, 0x91, 0xd4, 0xd4, 0x10, 0xfb, 0x8c, 0xb4 } \
++  }
++
++typedef struct efi_mok2_verify_protocol efi_mok2_verify_protocol_t;
++
++typedef grub_efi_status_t
++(*grub_efi_mok2_verify_signature) (efi_mok2_verify_protocol_t *this,
++				   void *signature,
++				   grub_efi_uintn_t signature_size,
++				   void *data, grub_efi_uintn_t data_size);
++
++typedef grub_efi_status_t
++(*grub_efi_mok2_verify_file_buffer) (efi_mok2_verify_protocol_t *this,
++				     void **data, grub_efi_uintn_t *data_size,
++				     const grub_efi_char16_t *path);
++
++typedef grub_efi_status_t
++(*grub_efi_mok2_verify_file) (efi_mok2_verify_protocol_t *this,
++			      const grub_efi_char16_t *path);
++
++struct efi_mok2_verify_protocol {
++	grub_efi_uint8_t revision;
++	grub_efi_mok2_verify_signature verify_signature;
++	grub_efi_mok2_verify_file_buffer verify_file_buffer;
++	grub_efi_mok2_verify_file verify_file;
++};
++
++static grub_efi_guid_t grub_efi_mok2_verify_protoco_guid = EFI_MOK2_VERIFY_PROTOCOL_GUID;
++
++grub_err_t
++grub_verify_file (const char *path)
++{
++  efi_mok2_verify_protocol_t *mok2;
++  grub_efi_char16_t *p;
++  grub_size_t len = grub_strlen (path);
++  grub_efi_char16_t file_path[(len + 1) * GRUB_MAX_UTF16_PER_UTF8];
++  const char *root;
++  const char *real_path;
++  grub_efi_status_t status;
++
++  mok2 = grub_efi_locate_protocol (&grub_efi_mok2_verify_protoco_guid, 0);
++  if (!mok2)
++    {
++      grub_dprintf ("mok2verify", "unable to load mok2 verify protocol\n");
++      return GRUB_ERR_NONE;
++    }
++
++  grub_dprintf ("mok2verify", "attempting to verify the file %s ...\n", path);
++
++  real_path = path;
++  root = grub_env_get ("root");
++  if (root)
++    {
++      char *pattern;
++
++      pattern = grub_xasprintf ("(%s)", root);
++      if (!pattern)
++	return grub_errno;
++
++      if (grub_strstr (path, pattern) == path)
++	{
++	  real_path = path + grub_strlen (pattern);
++	  len -= grub_strlen (pattern);
++	}
++
++      grub_free (pattern);
++    }
++  
++  len = grub_utf8_to_utf16 (file_path, len * GRUB_MAX_UTF16_PER_UTF8,
++			    (const grub_uint8_t *) real_path, len, 0);
++  file_path[len] = 0;
++  for (p = file_path; p < file_path + len; ++p)
++    if (*p == '/')
++      *p = '\\';
++
++  status = efi_call_2 (mok2->verify_file, mok2, file_path);
++  if (status != GRUB_EFI_SUCCESS)
++    {
++      if (status == GRUB_EFI_NOT_FOUND)
++	return grub_error (GRUB_ERR_FILE_NOT_FOUND, "the specified file %s is not found",
++			   path);
++      else
++	{
++	  grub_printf ("failed to verify file %s (err: 0x%lx)\n",
++		       path, status);
++
++	  return GRUB_ERR_ACCESS_DENIED;
++	}
++    }
++
++  grub_dprintf ("mok2verify", "succeeded to verify file %s\n", path);
++
++  return GRUB_ERR_NONE;
++}
+diff --git a/grub-core/loader/i386/linux.c b/grub-core/loader/i386/linux.c
+index e2425c8..1f5d645 100644
+--- a/grub-core/loader/i386/linux.c
++++ b/grub-core/loader/i386/linux.c
+@@ -34,6 +34,9 @@
+ #include <grub/i386/relocator.h>
+ #include <grub/i18n.h>
+ #include <grub/lib/cmdline.h>
++#ifdef GRUB_MACHINE_EFI
++#include <grub/efi/mok2verify.h>
++#endif
+ 
+ GRUB_MOD_LICENSE ("GPLv3+");
+ 
+@@ -664,6 +667,55 @@ grub_linux_unload (void)
+   return GRUB_ERR_NONE;
+ }
+ 
++#ifdef GRUB_MACHINE_EFI
++static grub_err_t
++grub_verify_linux (const char *path)
++{
++  grub_file_t file;
++  grub_ssize_t size;
++  grub_uint8_t *buf = NULL;
++
++  grub_dprintf ("linux", "Verifying kernel %s\n", path);
++
++  file = grub_file_open (path);
++  if (!file)
++    return grub_errno;
++
++  size = grub_file_size (file);
++
++  buf = grub_malloc (size);
++  if (!buf)
++    goto fail;
++
++  if (grub_file_read (file, buf, size) != size)
++    {
++      if (!grub_errno)
++        grub_error (GRUB_ERR_BAD_OS, N_("premature end of kernel file %s"),
++                    path);
++      goto fail;
++    }
++
++  if (grub_verify_file (path) == GRUB_ERR_NONE)
++    grub_dprintf ("linux", "kernel %s verified\n", path);
++  else
++    grub_error (grub_errno, N_("failed to verify kernel %s"), path);
++
++fail:
++  if (buf)
++    grub_free (buf);
++
++  grub_file_close (file);
++
++  return grub_errno;
++}
++#else
++static grub_err_t
++grub_verify_linux (const char *path)
++{
++  return GRUB_ERR_NONE;
++}
++#endif
++
+ static grub_err_t
+ grub_cmd_linux (grub_command_t cmd __attribute__ ((unused)),
+ 		int argc, char *argv[])
+@@ -687,6 +739,9 @@ grub_cmd_linux (grub_command_t cmd __attribute__ ((unused)),
+       goto fail;
+     }
+ 
++  if (grub_verify_linux (argv[0]))
++    goto fail;
++
+   file = grub_file_open (argv[0]);
+   if (! file)
+     goto fail;
+@@ -1132,6 +1187,23 @@ grub_cmd_initrd (grub_command_t cmd __attribute__ ((unused)),
+ 			argv[i]);
+ 	  goto fail;
+ 	}
++
++#ifdef GRUB_MACHINE_EFI
++      grub_dprintf ("linux", "Verifying initrd %s, addr=0x%lx, size=0x%lx\n",
++		    argv[i], (unsigned long) ptr, (unsigned long) cursize);
++
++      //if (grub_verify_file_buffer (argv[i], ptr, cursize) == GRUB_ERR_NONE)
++      if (grub_verify_file (argv[i]) == GRUB_ERR_NONE)
++	{
++	  grub_dprintf ("linux", "initrd %s verified\n", argv[i]);
++	}
++      else
++	{
++	  grub_error (err, N_("failed to verify initrd %s"), argv[i]);
++	  goto fail;
++	}
++#endif
++
+       ptr += cursize;
+       grub_memset (ptr, 0, ALIGN_UP_OVERHEAD (cursize, 4));
+       ptr += ALIGN_UP_OVERHEAD (cursize, 4);
+diff --git a/grub-core/normal/main.c b/grub-core/normal/main.c
+index 13473ec..4195bef 100644
+--- a/grub-core/normal/main.c
++++ b/grub-core/normal/main.c
+@@ -32,6 +32,9 @@
+ #include <grub/i18n.h>
+ #include <grub/charset.h>
+ #include <grub/script_sh.h>
++#ifdef GRUB_MACHINE_EFI
++#include <grub/efi/mok2verify.h>
++#endif
+ 
+ GRUB_MOD_LICENSE ("GPLv3+");
+ 
+@@ -294,6 +297,14 @@ grub_normal_execute (const char *config, int nested, int batch)
+ 
+   if (config)
+     {
++#ifdef GRUB_MACHINE_EFI
++      if (grub_verify_file (config) != GRUB_ERR_NONE)
++	{
++	  grub_error (GRUB_ERR_BAD_OS, "failed to verify grub.cfg");
++	  return;
++	}
++#endif
++
+       menu = read_config_file (config);
+ 
+       /* Ignore any error.  */
+diff --git a/include/grub/efi/mok2verify.h b/include/grub/efi/mok2verify.h
+new file mode 100644
+index 0000000..4281ea6
+--- /dev/null
++++ b/include/grub/efi/mok2verify.h
+@@ -0,0 +1,39 @@
++/*
++ * mok2verify.h - interface to MOK2 Verify Protocol
++ *
++ * BSD 2-clause "Simplified" License
++ *
++ * Copyright (c) 2017, Lans Zhang <jia.zhang@windriver.com>
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are met:
++ *
++ * * Redistributions of source code must retain the above copyright notice, this
++ *   list of conditions and the following disclaimer.
++ *
++ * * Redistributions in binary form must reproduce the above copyright notice,
++ *   this list of conditions and the following disclaimer in the documentation
++ *   and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
++ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
++ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
++ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++#ifndef GRUB_EFI_MOK2_VERIFY_HEADER
++#define GRUB_EFI_MOK2_VERIFY_HEADER 1
++
++#include <grub/types.h>
++
++grub_err_t
++EXPORT_FUNC (grub_verify_file) (const char *path);
++
++#endif	/* ! GRUB_EFI_MOK2_VERIFY_HEADER */
+-- 
+2.7.4
+
