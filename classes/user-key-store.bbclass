@@ -129,6 +129,34 @@ def shim_prepare_sb_keys(d):
     if uks_signing_model(d) == 'user':
        d.appendVar('EXTRA_OEMAKE', ' VENDOR_DBX_FILE="${WORKDIR}/vendor_dbx.esl"')
 
+def sel_sign(key, cert, input, d):
+    import bb.process
+
+    print d.getVar('STAGING_LIBDIR_NATIVE', True)
+    cmd = (' '.join(('LD_LIBRARY_PATH=' + d.getVar('STAGING_LIBDIR_NATIVE', True),
+           d.getVar('STAGING_BINDIR_NATIVE', True) + '/selsign',
+           '--key', key, '--cert', cert, input)))
+    vprint("Signing %s with the key %s ..." % (input, key), d)
+    try:
+        result, _ = bb.process.run(cmd)
+    except:
+        raise bb.build.FuncFailed('ERROR: Unable to sign %s' % input)
+
+def uks_sel_sign(input, d):
+    if d.getVar('UEFI_SB', True) != '1':
+        return
+
+    if d.getVar('MOK_SB', True) == '1':
+        _ = mok_sb_keys_dir(d)
+        key = _ + 'shim_cert.key'
+        cert = _ + 'shim_cert.pem'
+    else:
+        _ = uefi_sb_keys_dir(d)
+        key = _ + 'DB.key'
+        cert = _ + 'DB.pem'
+
+    sel_sign(key, cert, input, d)
+
 def check_ima_user_keys(d):
     dir = uks_ima_keys_dir(d)
 
