@@ -69,4 +69,14 @@ do_deploy_append() {
     if [ -f "${B}/bzImage.initramfs.unsigned" ]; then
         install -m 0600 "${B}/bzImage.initramfs.unsigned" "$dir/bzImage.initramfs"
     fi
+
+    dir="${DEPLOYDIR}"
+
+    if [ -f "${D}/boot/bzImage-${KERNEL_RELEASE}.p7b" ]; then
+        install -m 0600 "${D}/boot/bzImage-${KERNEL_RELEASE}.p7b" "$dir"
+    fi
+
+    if [ -f "${D}/boot/bzImage-initramfs-${MACHINE}.bin.p7b" ]; then
+        install -m 0600 "${D}/boot/bzImage-initramfs-${MACHINE}.bin.p7b" "$dir"
+    fi
 }
