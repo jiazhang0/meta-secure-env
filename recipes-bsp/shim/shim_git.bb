@@ -29,6 +29,7 @@ SRC_URI = " \
         file://Fix-the-world-build-failure-due-to-the-missing-rule-.patch \
         file://Don-t-enforce-to-use-gnu89-standard.patch \
 	file://Makefile-do-not-sign-the-efi-file.patch \
+	file://generate_hash-fix-the-regression.patch \
 "
 SRCREV = "9f2c83e60e0758c3db387eebaed3f306ad6214a8"
 PV = "0.9+git${SRCPV}"

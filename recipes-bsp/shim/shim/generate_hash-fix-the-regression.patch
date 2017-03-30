@@ -1,0 +1,33 @@
+From 003d8c6598f838fbb6710afc0cf831d1321b8de0 Mon Sep 17 00:00:00 2001
+From: Lans Zhang <jia.zhang@windriver.com>
+Date: Thu, 30 Mar 2017 13:59:50 +0800
+Subject: [PATCH] generate_hash(): fix the regression
+
+The commit 03b9f800 introduces an issue in case the gap between
+SumOfBytesHashed and context->SecDir->VirtualAddress exists.
+
+This would be a typo because a formal PE image always meet
+SumOfBytesHashed + hashsize == context->SecDir->VirtualAddress either
+the gap exists or not.
+
+Signed-off-by: Lans Zhang <jia.zhang@windriver.com>
+---
+ shim.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/shim.c b/shim.c
+index a5e6241..14a3f83 100644
+--- a/shim.c
++++ b/shim.c
+@@ -893,7 +893,7 @@ static EFI_STATUS generate_hash (char *data, unsigned int datasize_in,
+ 		hashsize = datasize - context->SecDir->Size - SumOfBytesHashed;
+ 
+ 		if ((datasize - SumOfBytesHashed < context->SecDir->Size) ||
+-		    (SumOfBytesHashed - hashsize != context->SecDir->VirtualAddress)) {
++		    (SumOfBytesHashed + hashsize != context->SecDir->VirtualAddress)) {
+ 			perror(L"Malformed binary after Attribute Certificate Table\n");
+ 			status = EFI_INVALID_PARAMETER;
+ 			goto done;
+-- 
+2.7.4
+
