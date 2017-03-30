@@ -59,13 +59,18 @@ do_install() {
     oe_runmake install EFI_DESTDIR=${D}${EFI_TARGET}
 }
 
-# Install the unsigned images for manual signing
 do_deploy() {
+    # Deploy the unsigned images for manual signing
     install -d ${DEPLOYDIR}/efi-unsigned
 
     install -m 0600 ${B}/Src/Efi/SELoader.efi \
         ${DEPLOYDIR}/efi-unsigned/SELoader${EFI_ARCH}.efi
     install -m 0600 ${B}/Bin/Hash2DxeCrypto.efi ${DEPLOYDIR}/efi-unsigned/
     install -m 0600 ${B}/Bin/Pkcs7VerifyDxe.efi ${DEPLOYDIR}/efi-unsigned/
+
+    # Deploy the signed images
+    install -m 0600 ${B}/SELoader${EFI_ARCH}.efi.signed ${DEPLOYDIR}/SELoader${EFI_ARCH}.efi
+    install -m 0600 ${B}/Hash2DxeCrypto.efi.signed ${DEPLOYDIR}/Hash2DxeCrypto.efi
+    install -m 0600 ${B}/Pkcs7VerifyDxe.efi.signed ${DEPLOYDIR}/Pkcs7VerifyDxe.efi
 }
 addtask deploy after do_install before do_build
