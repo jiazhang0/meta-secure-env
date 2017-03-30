@@ -4,7 +4,7 @@
 
 inherit user-key-store
 
-python do_sign() {
+fakeroot python do_sign() {
     import re
 
     if ('${TARGET_ARCH}' != 'x86_64') and (not re.match('i.86', '${TARGET_ARCH}')):
