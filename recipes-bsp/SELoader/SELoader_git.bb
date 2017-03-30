@@ -2,13 +2,21 @@
 # Copyright (C) 2017 Wind River Systems, Inc.
 #
 
-SUMMARY = "authenticate the non-PE files."
-DESCRIPTION = "The SELoader is designed to authenticate the non-PE files \
-which cannot be verified by the protocol supplied by MOK Secure Boot, \
-such as grub configuration, initrd, grub modules and so on. \
-The SELoader employs PKCS7 Verify Protocol available since UEFI Specification \
-version 2.5 to verify the signature to prove the integrity of checked file. If \
-BIOS doesn't support it, a pre-built Pkcs7VerifyDxe driver is provided."
+SUMMARY = "The bootloader capable of authenticating the PE and non-PE files."
+DESCRIPTION = "The SELoader is designed to authenticate the non-PE files, \
+such as grub configuration, initrd, grub modules, which cannot be verified \
+by the MOK Verify Protocol registered by shim loader. \
+\
+In order to conveniently authenticate the PE file with gBS->LoadImage() \
+and gBS->StartImage(), the SELoader hooks EFI Security2 Architectural \
+Protocol and employs MOK Verify Protocol to verify the PE file. If only \
+UEFI Secure Boot is enabled, the SELoader just simplily calls \
+gBS->LoadImage() and gBS->StartImage() to allow BIOS to verify PE file. \
+\
+The SELoader publishes MOK2 Verify Protocol which provides a flexible \
+interface to allow the bootloader to verify the file, file buffer or \
+memory buffer without knowing the file format. \
+"
 HOMEPAGE = "https://github.com/jiazhang0/SELoader.git"
 SECTION = "bootloaders"
 
@@ -19,7 +27,7 @@ SRC_URI = " \
     git://github.com/jiazhang0/SELoader.git \
 "
 SRCREV = "${AUTOREV}"
-PV = "0.3.0+git${SRCPV}"
+PV = "0.4.0+git${SRCPV}"
 
 COMPATIBLE_HOST = '(i.86|x86_64).*-linux'
 
