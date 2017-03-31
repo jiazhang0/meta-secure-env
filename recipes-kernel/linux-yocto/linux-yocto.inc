@@ -29,7 +29,7 @@ fakeroot python do_sign() {
 }
 addtask sign after do_install before do_package do_populate_sysroot do_deploy
 
-python do_sign_kernel_initramfs() {
+fakeroot python do_sign_kernel_initramfs() {
     import re
 
     if ('${TARGET_ARCH}' != 'x86_64') and (not re.match('i.86', '${TARGET_ARCH}')):
