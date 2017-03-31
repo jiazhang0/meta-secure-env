@@ -31,7 +31,7 @@ def sign_efi_image(key, cert, input, output, d):
     vprint("Signing %s with the key %s ..." % (input, key), d)
     try:
         result, _ = bb.process.run(cmd)
-    except:
+    except bb.process.ExecutionError:
         raise bb.build.FuncFailed('ERROR: Unable to sign %s' % input)
 
 def edss_sign_efi_image(input, output, d):
@@ -139,7 +139,7 @@ def sel_sign(key, cert, input, d):
     vprint("Signing %s with the key %s ..." % (input, key), d)
     try:
         result, _ = bb.process.run(cmd)
-    except:
+    except bb.process.ExecutionError:
         raise bb.build.FuncFailed('ERROR: Unable to sign %s' % input)
 
 def uks_sel_sign(input, d):
@@ -174,7 +174,7 @@ def pem2der(input, output, d):
            '-in', input, '-out', output)))
     try:
         result, _ = bb.process.run(cmd)
-    except:
+    except bb.process.ExecutionError:
         raise bb.build.FuncFailed('ERROR: Unable to convert %s to %s' % (input, output))
 
 # Convert the certificate (PEM formatted) to ESL.
@@ -230,7 +230,7 @@ def __create_blacklist(d):
                    tmp_dir + '/' + _ + '.esl')))
             try:
                 result, _ = bb.process.run(cmd)
-            except:
+            except bb.process.ExecutionError:
                 vprint('Unable to convert %s' % fn)
                 continue
 
