@@ -13,23 +13,29 @@ fakeroot python do_sign() {
     if '${UEFI_SB}' != '1':
         return
 
-    # Make sure the kernel image has been signed before kernel_do_deploy()
-    # which prepares the kernel image for creating usb/iso.
-    kernel = '${B}/arch/x86/boot/bzImage'
-
-    # Prepare the unsigned kernel image for manual signing.
     import shutil
-    shutil.copy(kernel, '${B}/bzImage.unsigned')
 
-    sb_sign(kernel, kernel, d)
-    uks_sel_sign(kernel, d)
+    for type in '${KERNEL_IMAGETYPES}'.split():
+        kernel = '${B}/${KERNEL_OUTPUT}/' + type
 
-    shutil.copyfile(kernel, '${D}/boot/bzImage-${KERNEL_RELEASE}')
-    shutil.copyfile(kernel + '.p7b', '${D}/boot/bzImage-${KERNEL_RELEASE}' + '.p7b')
+        # Prepare the unsigned kernel image for manual signing.
+        shutil.copy(kernel, '${B}/' + type + '.unsigned')
+
+        sb_sign(kernel, kernel, d)
+
+        # SELoader signature is always based on the signed kernel image,
+        # allowing chainloader to kernel image.
+        uks_sel_sign(kernel, d)
+
+        shutil.copyfile(kernel, '${D}/boot/' + type + '-${KERNEL_RELEASE}')
+        shutil.copyfile(kernel + '.p7b', '${D}/boot/' + type + '-${KERNEL_RELEASE}.p7b')
 }
+
+# Make sure the kernel image has been signed before kernel_do_deploy()
+# which prepares the kernel image for creating usb/iso.
 addtask sign after do_install before do_package do_populate_sysroot do_deploy
 
-fakeroot python do_sign_kernel_initramfs() {
+fakeroot python do_sign_bundled_kernel() {
     import re
 
     if ('${TARGET_ARCH}' != 'x86_64') and (not re.match('i.86', '${TARGET_ARCH}')):
@@ -41,42 +47,47 @@ fakeroot python do_sign_kernel_initramfs() {
     if ('${INITRAMFS_IMAGE}' == '') or ('${INITRAMFS_IMAGE_BUNDLE}' != '1'):
         return
 
-    # Make sure the kernel image has been signed before kernel_do_deploy()
-    # which prepares the kernel image for creating usb/iso.
-    kernel_initramfs = '${B}/arch/x86/boot/bzImage.initramfs'
-
-    # Prepare the unsigned kernel image for manual signing.
     import shutil
-    shutil.copy(kernel_initramfs, '${B}/bzImage.initramfs.unsigned')
 
-    sb_sign(kernel_initramfs, kernel_initramfs, d)
-    uks_sel_sign(kernel_initramfs, d)
+    for type in '${KERNEL_IMAGETYPES}'.split():
+        kernel = '${B}/${KERNEL_OUTPUT}/' + type + '.initramfs'
 
-    shutil.copyfile(kernel_initramfs, '${D}/boot/bzImage-initramfs-${MACHINE}.bin')
-    shutil.copyfile(kernel_initramfs + '.p7b', '${D}/boot/bzImage-initramfs-${MACHINE}.bin.p7b')
+        # Prepare the unsigned kernel image for manual signing.
+        shutil.copy(kernel, '${B}/' + type + '.initramfs.unsigned')
+
+        sb_sign(kernel, kernel, d)
+
+        # SELoader signature is always based on the signed kernel image,
+        # allowing chainloader to kernel image.
+        uks_sel_sign(kernel, d)
+
+        shutil.copyfile(kernel, '${D}/boot/' + type + '-initramfs-${MACHINE}.bin')
+        shutil.copyfile(kernel + '.p7b', '${D}/boot/' + type + '-initramfs-${MACHINE}.bin.p7b')
 }
-addtask sign_kernel_initramfs after do_bundle_initramfs before do_deploy
+addtask sign_bundled_kernel after do_bundle_initramfs before do_deploy
 
 do_deploy_append() {
-    local dir="${DEPLOYDIR}/efi-unsigned"
+    install -d "${DEPLOYDIR}/efi-unsigned"
 
-    install -d $dir
+    for type in ${KERNEL_IMAGETYPES}; do
+        if [ -f "${B}/$type.unsigned" ]; then
+            install -m 0644 "${B}/$type.unsigned" "${DEPLOYDIR}/efi-unsigned/$type"
+        fi
 
-    if [ -f "${B}/bzImage.unsigned" ]; then
-        install -m 0600 "${B}/bzImage.unsigned" "$dir/bzImage"
-    fi
+        if [ -f "${B}/$type.initramfs.unsigned" ]; then
+            install -m 0644 "${B}/$type.initramfs.unsigned" "${DEPLOYDIR}/efi-unsigned/type.initramfs"
+        fi
 
-    if [ -f "${B}/bzImage.initramfs.unsigned" ]; then
-        install -m 0600 "${B}/bzImage.initramfs.unsigned" "$dir/bzImage.initramfs"
-    fi
+        if [ -f "${D}/boot/$type-initramfs-${MACHINE}.bin.p7b" ]; then
+            install -m 0644 "${D}/boot/$type-initramfs-${MACHINE}.bin.p7b" "${DEPLOYDIR}"
+        fi
 
-    dir="${DEPLOYDIR}"
+        if [ -f "${B}/${KERNEL_OUTPUT}/$type.p7b" ]; then
+            base_name="${type}-${KERNEL_IMAGE_BASE_NAME}.bin.p7b"
 
-    if [ -f "${D}/boot/bzImage-${KERNEL_RELEASE}.p7b" ]; then
-        install -m 0600 "${D}/boot/bzImage-${KERNEL_RELEASE}.p7b" "$dir"
-    fi
-
-    if [ -f "${D}/boot/bzImage-initramfs-${MACHINE}.bin.p7b" ]; then
-        install -m 0600 "${D}/boot/bzImage-initramfs-${MACHINE}.bin.p7b" "$dir"
-    fi
+            install -m 0644 "${B}/${KERNEL_OUTPUT}/$type.p7b" "${DEPLOYDIR}/$base_name"
+            ln -sf "$base_name" "${DEPLOYDIR}/$type-${KERNEL_IMAGE_SYMLINK_NAME}.bin.p7b"
+            ln -sf "$base_name" "${DEPLOYDIR}/$type.p7b"
+        fi
+    done
 }
