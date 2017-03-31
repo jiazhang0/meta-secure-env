@@ -1,4 +1,4 @@
-From a73471075f55ff790363cfc426a04ce18dcada1a Mon Sep 17 00:00:00 2001
+From d3a26fe4abb56a4be9b937e3ccf95747a924bc5a Mon Sep 17 00:00:00 2001
 From: Lans Zhang <jia.zhang@windriver.com>
 Date: Thu, 16 Mar 2017 14:49:41 +0800
 Subject: [PATCH] mok2verify: support to verify non-PE file with PKCS#7
@@ -15,11 +15,11 @@ https://github.com/jiazhang0/SELoader and  https://github.com/jiazhang0/libsign
 Signed-off-by: Lans Zhang <jia.zhang@windriver.com>
 ---
  grub-core/Makefile.core.def    |   6 ++
- grub-core/lib/efi/mok2verify.c | 139 +++++++++++++++++++++++++++++++++++++++++
+ grub-core/lib/efi/mok2verify.c | 140 +++++++++++++++++++++++++++++++++++++++++
  grub-core/loader/i386/linux.c  |  72 +++++++++++++++++++++
- grub-core/normal/main.c        |  11 ++++
+ grub-core/normal/main.c        |  14 +++++
  include/grub/efi/mok2verify.h  |  39 ++++++++++++
- 5 files changed, 267 insertions(+)
+ 5 files changed, 271 insertions(+)
  create mode 100644 grub-core/lib/efi/mok2verify.c
  create mode 100644 include/grub/efi/mok2verify.h
 
@@ -42,10 +42,10 @@ index e9e1483..8e72251 100644
    x86 = mmap/i386/uppermem.c;
 diff --git a/grub-core/lib/efi/mok2verify.c b/grub-core/lib/efi/mok2verify.c
 new file mode 100644
-index 0000000..e959073
+index 0000000..231d5a7
 --- /dev/null
 +++ b/grub-core/lib/efi/mok2verify.c
-@@ -0,0 +1,139 @@
+@@ -0,0 +1,140 @@
 +/* mok2verify.c - MOK2 Verify Protocol support
 + *
 + * BSD 2-clause "Simplified" License
@@ -177,7 +177,8 @@ index 0000000..e959073
 +	  grub_printf ("failed to verify file %s (err: 0x%lx)\n",
 +		       path, status);
 +
-+	  return GRUB_ERR_ACCESS_DENIED;
++	  return grub_error (GRUB_ERR_ACCESS_DENIED, "the file %s is not verified",
++			     path);
 +	}
 +    }
 +
@@ -290,7 +291,7 @@ index e2425c8..1f5d645 100644
        grub_memset (ptr, 0, ALIGN_UP_OVERHEAD (cursize, 4));
        ptr += ALIGN_UP_OVERHEAD (cursize, 4);
 diff --git a/grub-core/normal/main.c b/grub-core/normal/main.c
-index 13473ec..4195bef 100644
+index 13473ec..b408143 100644
 --- a/grub-core/normal/main.c
 +++ b/grub-core/normal/main.c
 @@ -32,6 +32,9 @@
@@ -303,14 +304,17 @@ index 13473ec..4195bef 100644
  
  GRUB_MOD_LICENSE ("GPLv3+");
  
-@@ -294,6 +297,14 @@ grub_normal_execute (const char *config, int nested, int batch)
+@@ -294,6 +297,17 @@ grub_normal_execute (const char *config, int nested, int batch)
  
    if (config)
      {
 +#ifdef GRUB_MACHINE_EFI
-+      if (grub_verify_file (config) != GRUB_ERR_NONE)
++      grub_err_t err;
++
++      err = grub_verify_file (config);
++      if (err != GRUB_ERR_NONE)
 +	{
-+	  grub_error (GRUB_ERR_BAD_OS, "failed to verify grub.cfg");
++	  grub_error (err, "failed to verify grub.cfg");
 +	  return;
 +	}
 +#endif
