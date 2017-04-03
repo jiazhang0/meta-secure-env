@@ -263,7 +263,7 @@ Verification
 ============
 
 By default, the build system will use DB.key to automatically sign shim, and use
-shim_cert.key to sign grub2 and kernel image during the build.
+vendor_cert.key to sign grub2 and kernel image during the build.
 
 Shim Loader Verification
 ------------------------

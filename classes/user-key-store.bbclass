@@ -108,7 +108,7 @@ def mok_sb_sign(input, output, d):
         return
 
     _ = mok_sb_keys_dir(d)
-    sign_efi_image(_ + 'shim_cert.key', _ + 'shim_cert.pem', input, output, d)
+    sign_efi_image(_ + 'vendor_cert.key', _ + 'vendor_cert.pem', input, output, d)
 
 # Prepare signing keys for shim
 def shim_prepare_sb_keys(d):
@@ -148,8 +148,8 @@ def uks_sel_sign(input, d):
 
     if d.getVar('MOK_SB', True) == '1':
         _ = mok_sb_keys_dir(d)
-        key = _ + 'shim_cert.key'
-        cert = _ + 'shim_cert.pem'
+        key = _ + 'vendor_cert.key'
+        cert = _ + 'vendor_cert.pem'
     else:
         _ = uefi_sb_keys_dir(d)
         key = _ + 'DB.key'
