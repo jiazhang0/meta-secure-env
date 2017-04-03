@@ -123,11 +123,6 @@ def shim_prepare_sb_keys(d):
     import shutil
     shutil.copyfile(dir + 'shim_cert.pem', d.getVar('S', True) + '/shim.crt')
     pem2der(dir + 'vendor_cert.pem', d.getVar('WORKDIR', True) + '/vendor_cert.cer', d)
-    d.appendVar('EXTRA_OEMAKE', ' VENDOR_CERT_FILE="${WORKDIR}/vendor_cert.cer"')
-
-    # add blacklist for user
-    if uks_signing_model(d) == 'user':
-       d.appendVar('EXTRA_OEMAKE', ' VENDOR_DBX_FILE="${WORKDIR}/vendor_dbx.esl"')
 
 def sel_sign(key, cert, input, d):
     import bb.process
