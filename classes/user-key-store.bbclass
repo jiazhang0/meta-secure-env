@@ -348,6 +348,34 @@ def create_user_keys(name, d):
     vprint('Creating the user keys for %s ...' % name, d)
     bb.build.exec_func('create_' + name.lower() + '_user_keys', d)
 
+
+deploy_uefi_sb_sample_keys() {
+    local deploy_dir="${DEPLOY_DIR_IMAGE}/sample-keys/uefi_sb_keys"
+
+    install -d "$deploy_dir"
+
+    cp -a "${SAMPLE_UEFI_SB_KEYS_DIR}"/* "$deploy_dir"
+}
+
+deploy_mok_sb_sample_keys() {
+    local deploy_dir="${DEPLOY_DIR_IMAGE}/sample-keys/mok_sb_keys"
+
+    install -d "$deploy_dir"
+
+    cp -a "${SAMPLE_MOK_SB_KEYS_DIR}"/* "$deploy_dir"
+}
+
+deploy_ima_sample_keys() {
+    local deploy_dir="${DEPLOY_DIR_IMAGE}/sample-keys/ima_keys"
+
+    install -d "$deploy_dir"
+
+    cp -a "${SAMPLE_IMA_KEYS_DIR}"/* "$deploy_dir"
+}
+
+def deploy_sample_keys(name, d):
+    bb.build.exec_func('deploy_' + name.lower() + '_sample_keys', d)
+
 def sanity_check_user_keys(name, may_exit, d):
     vprint('Checking the user keys for %s ...' % name, d)
 
@@ -398,7 +426,13 @@ python do_check_user_keys_class-target () {
     # XXX: the user key for rpm signing is necessary but not required.
     for _ in ('UEFI_SB', 'MOK_SB', 'IMA'):
         # Intend to use user key?
-        if (d.getVar(_, True) != "1") or ("${SIGNING_MODEL}" != "user"):
+        if d.getVar(_, True) != "1":
+            continue
+
+        if "${SIGNING_MODEL}" == "sample":
+            deploy_sample_keys(_, d)
+            continue
+        elif "${SIGNING_MODEL}" != "user":
             continue
 
         # Check if the generation for user key is required. If so,
