@@ -29,7 +29,7 @@ index da53699..9fd03cf 100644
 -				       FullDataSize, FullData);
 -	if (efi_status != EFI_SUCCESS) {
 -		perror(L"Failed to set MokListRT: %r\n", efi_status);
-+	if (DataSize) {
++	if (FullDataSize) {
 +		efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"MokListRT",
 +					       &shim_lock_guid,
 +					       EFI_VARIABLE_BOOTSERVICE_ACCESS
