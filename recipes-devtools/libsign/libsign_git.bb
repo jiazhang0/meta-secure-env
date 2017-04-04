@@ -19,7 +19,7 @@ SRC_URI = " \
     git://github.com/jiazhang0/libsign.git \
 "
 SRCREV = "${AUTOREV}"
-PV = "0.3.0+git${SRCPV}"
+PV = "0.3.1+git${SRCPV}"
 
 DEPENDS += "openssl"
 RDEPENDS_${PN}_class-target += "libcrypto"
