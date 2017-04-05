@@ -1,7 +1,7 @@
-From 7739989b1c3fac054d659ef9f4bc157f30bb8ddd Mon Sep 17 00:00:00 2001
+From a4f80f85079a4f52c94ec0dcc064b3ca26db919c Mon Sep 17 00:00:00 2001
 From: Lans Zhang <jia.zhang@windriver.com>
 Date: Wed, 21 Sep 2016 11:23:00 +0800
-Subject: [PATCH] Fix for the cross compilation
+Subject: [PATCH 04/11] Fix for the cross compilation
 
 Upstream-Status: Pending
 
@@ -12,7 +12,7 @@ Signed-off-by: Lans Zhang <jia.zhang@windriver.com>
  2 files changed, 9 insertions(+), 5 deletions(-)
 
 diff --git a/Makefile b/Makefile
-index 860fc10..1a3f96e 100644
+index f63fe21..dcfa357 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -8,6 +8,10 @@ CC		= $(CROSS_COMPILE)gcc
@@ -69,5 +69,5 @@ index d93a26d..37f5746 100644
  all: $(TARGET)
  
 -- 
-1.9.1
+2.11.0
 

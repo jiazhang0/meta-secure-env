@@ -1,7 +1,7 @@
-From b274b5261e4755089be4aba05cc8c10881580b3b Mon Sep 17 00:00:00 2001
+From 3e4fe73d51eb1adf8bb45cc00e66f0b2b5ee9bab Mon Sep 17 00:00:00 2001
 From: Lans Zhang <jia.zhang@windriver.com>
 Date: Wed, 21 Sep 2016 11:19:25 +0800
-Subject: [PATCH] Allow to override the path to openssl
+Subject: [PATCH 03/11] Allow to override the path to openssl
 
 Upstream-Status: Pending
 
@@ -11,7 +11,7 @@ Signed-off-by: Lans Zhang <jia.zhang@windriver.com>
  1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/Makefile b/Makefile
-index c02cc94..860fc10 100644
+index 71d03aa..f63fe21 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -7,6 +7,7 @@ endif
@@ -32,5 +32,5 @@ index c02cc94..860fc10 100644
  shim_cert.h: shim.cer
  	echo "static UINT8 shim_cert[] = {" > $@
 -- 
-1.9.1
+2.11.0
 

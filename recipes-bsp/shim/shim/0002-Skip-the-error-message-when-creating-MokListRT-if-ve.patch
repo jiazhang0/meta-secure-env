@@ -1,8 +1,8 @@
-From c590fa1e909b3f751b76bad0181f865c50bdf27c Mon Sep 17 00:00:00 2001
+From 5c922c31b8a63a83837899bb78028470408e9ade Mon Sep 17 00:00:00 2001
 From: Lans Zhang <jia.zhang@windriver.com>
 Date: Wed, 11 Nov 2015 17:11:43 +0800
-Subject: [PATCH] Skip the error message when creating MokListRT if vendor cert
- is empty
+Subject: [PATCH 02/11] Skip the error message when creating MokListRT if
+ vendor cert is empty
 
 Upstream-Status: Pending
 
@@ -15,10 +15,10 @@ Signed-off-by: Lans Zhang <jia.zhang@windriver.com>
  1 file changed, 9 insertions(+), 7 deletions(-)
 
 diff --git a/shim.c b/shim.c
-index da53699..9fd03cf 100644
+index 9157ca7..364784b 100644
 --- a/shim.c
 +++ b/shim.c
-@@ -1793,13 +1793,15 @@ EFI_STATUS mirror_mok_list()
+@@ -2000,13 +2000,15 @@ EFI_STATUS mirror_mok_list()
  		FullData = Data;
  	}
  
@@ -42,5 +42,5 @@ index da53699..9fd03cf 100644
  
  	return efi_status;
 -- 
-1.9.1
+2.11.0
 

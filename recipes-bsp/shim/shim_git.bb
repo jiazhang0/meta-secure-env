@@ -17,22 +17,21 @@ LICENSE = "shim"
 LIC_FILES_CHKSUM = "file://COPYRIGHT;md5=b92e63892681ee4e8d27e7a7e87ef2bc"
 PR = "r0"
 SRC_URI = " \
-        git://github.com/rhinstaller/shim.git \
-        file://shim-allow-to-verify-sha1-digest-for-Authenticode.patch \
-        file://Update-verification_method-if-the-loaded-image-is-si.patch  \
-        file://Skip-the-error-message-when-creating-MokListRT-if-ve.patch \
-        file://Allow-to-override-the-path-to-openssl.patch \
-        file://Fix-for-the-cross-compilation.patch \
-        file://Fix-signing-failure-due-to-not-finding-certificate.patch \
-        file://Prevent-from-removing-intermediate-.efi.patch \
-        file://Use-sbsign-to-sign-MokManager-and-fallback.patch \
-        file://Fix-the-world-build-failure-due-to-the-missing-rule-.patch \
-        file://Don-t-enforce-to-use-gnu89-standard.patch \
-	file://Makefile-do-not-sign-the-efi-file.patch \
-	file://generate_hash-fix-the-regression.patch \
+	git://github.com/rhinstaller/shim.git \
+	file://0001-shim-allow-to-verify-sha1-digest-for-Authenticode.patch \
+	file://0002-Skip-the-error-message-when-creating-MokListRT-if-ve.patch \
+	file://0003-Allow-to-override-the-path-to-openssl.patch \
+	file://0004-Fix-for-the-cross-compilation.patch \
+	file://0005-Fix-signing-failure-due-to-not-finding-certificate.patch \
+	file://0006-Prevent-from-removing-intermediate-.efi.patch \
+	file://0007-Use-sbsign-to-sign-MokManager-and-fallback.patch \
+	file://0008-Fix-the-world-build-failure-due-to-the-missing-rule-.patch \
+	file://0009-Don-t-enforce-to-use-gnu89-standard.patch \
+	file://0010-Makefile-do-not-sign-the-efi-file.patch \
+	file://0011-Update-verification_method-if-the-loaded-image-is-si.patch \
 "
-SRCREV = "9f2c83e60e0758c3db387eebaed3f306ad6214a8"
-PV = "0.9+git${SRCPV}"
+SRCREV = "6dd948b57b129bf4e011804df24b4946da01e8c5"
+PV = "10+git${SRCPV}"
 
 COMPATIBLE_HOST = '(i.86|x86_64).*-linux'
 

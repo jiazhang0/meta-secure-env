@@ -1,7 +1,7 @@
-From bcc7049b80987200ebe2923ae389301d855eb92d Mon Sep 17 00:00:00 2001
+From 508a31905aff2d271f1b82a5a36a614113b7fe85 Mon Sep 17 00:00:00 2001
 From: Lans Zhang <jia.zhang@windriver.com>
 Date: Mon, 6 Jun 2016 16:28:09 +0800
-Subject: [PATCH] Fix the world build failure due to the missing rule of
+Subject: [PATCH 08/11] Fix the world build failure due to the missing rule of
  generating shim.key
 
 Upstream-Status: Pending
@@ -18,10 +18,10 @@ Signed-off-by: Lans Zhang <jia.zhang@windriver.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/Makefile b/Makefile
-index 72d4ee7..9f69285 100644
+index 58b4b4c..0da5e6c 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -84,7 +84,7 @@ FALLBACK_SRCS = fallback.c
+@@ -110,7 +110,7 @@ endif
  
  all: $(TARGET)
  
@@ -31,5 +31,5 @@ index 72d4ee7..9f69285 100644
  
  shim.cer: shim.crt
 -- 
-1.9.1
+2.11.0
 

@@ -1,7 +1,7 @@
-From 1d98735e289b7036881e4333c920716ee2b31c94 Mon Sep 17 00:00:00 2001
+From 1f03018aa0b7df2eab576d410ec88e8cf66b06e0 Mon Sep 17 00:00:00 2001
 From: Lans Zhang <jia.zhang@windriver.com>
 Date: Wed, 21 Sep 2016 11:25:14 +0800
-Subject: [PATCH] Prevent from removing intermediate .efi
+Subject: [PATCH 06/11] Prevent from removing intermediate .efi
 
 Upstream-Status: Pending
 
@@ -16,7 +16,7 @@ Signed-off-by: Lans Zhang <jia.zhang@windriver.com>
  1 file changed, 2 insertions(+)
 
 diff --git a/Makefile b/Makefile
-index 85b05a5..893435f 100644
+index efab050..7c71993 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -100,6 +100,8 @@ MOK_SOURCES = MokManager.c shim.h include/console.h PasswordCrypt.c PasswordCryp
@@ -29,5 +29,5 @@ index 85b05a5..893435f 100644
  	OBJS += httpboot.o
  	SOURCES += httpboot.c httpboot.h
 -- 
-1.9.1
+2.11.0
 

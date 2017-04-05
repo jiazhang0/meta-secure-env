@@ -1,7 +1,7 @@
-From 6cab52abfacaa72304da7d0aea627a74f91cc56d Mon Sep 17 00:00:00 2001
+From 85e74fa95094175753e39acdd694f9c639069abf Mon Sep 17 00:00:00 2001
 From: Lans Zhang <jia.zhang@windriver.com>
 Date: Fri, 18 Mar 2016 12:30:08 +0800
-Subject: [PATCH] Fix signing failure due to not finding certificate
+Subject: [PATCH 05/11] Fix signing failure due to not finding certificate
 
 Upstream-Status: Pending
 
@@ -15,10 +15,10 @@ Signed-off-by: Lans Zhang <jia.zhang@windriver.com>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/Makefile b/Makefile
-index 4e44367..b6771f8 100644
+index dcfa357..efab050 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -99,10 +99,10 @@ version.c : version.c.in
+@@ -124,10 +124,10 @@ version.c : version.c.in
  		-e "s,@@COMMIT@@,$(shell if [ -d .git ] ; then git log -1 --pretty=format:%H ; elif [ -f commit ]; then cat commit ; else echo commit id not available; fi)," \
  		< version.c.in > version.c
  
@@ -32,5 +32,5 @@ index 4e44367..b6771f8 100644
  shim.o: $(SOURCES) shim_cert.h
  shim.o: $(wildcard *.h)
 -- 
-1.9.1
+2.11.0
 

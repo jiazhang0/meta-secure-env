@@ -1,4 +1,4 @@
-From 137e311af149ce4fb46194fefacdda63485ae122 Mon Sep 17 00:00:00 2001
+From eb4a307edb1d730c8063276f15746be18c07fe36 Mon Sep 17 00:00:00 2001
 From: Lans Zhang <jia.zhang@windriver.com>
 Date: Sun, 19 Feb 2017 11:14:36 +0800
 Subject: [PATCH 01/11] shim: allow to verify sha1 digest for Authenticode
@@ -14,7 +14,7 @@ Signed-off-by: Lans Zhang <jia.zhang@windriver.com>
  1 file changed, 33 insertions(+), 13 deletions(-)
 
 diff --git a/shim.c b/shim.c
-index 1902da3..0cfdace 100644
+index 5cb75f0..9157ca7 100644
 --- a/shim.c
 +++ b/shim.c
 @@ -430,7 +430,8 @@ static BOOLEAN verify_eku(UINT8 *Cert, UINTN CertSize)
@@ -148,5 +148,5 @@ index 1902da3..0cfdace 100644
  	}
  
 -- 
-2.7.4
+2.11.0
 
