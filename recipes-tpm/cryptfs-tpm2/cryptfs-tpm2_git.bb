@@ -15,11 +15,15 @@ LIC_FILES_CHKSUM = "file://${S}/LICENSE;md5=35c0ab29d291dbbd14d66fd95521237f"
 SRC_URI = " \
     git://github.com/WindRiver-OpenSourceLabs/cryptfs-tpm2.git \
 "
-SRCREV = "a50d3a4bcda4373448f0abc249b726e2291079de"
+SRCREV = "ee6f2e07af6fdfdac75416761fa5f05503bf725f"
 PV = "0.5.0+git${SRCPV}"
 
 DEPENDS += "tpm2.0-tss"
 RDEPENDS_${PN} += "libtss2 libtctisocket tpm2.0-tools"
+
+PACKAGES =+ " \
+    ${PN}-initramfs-script \
+"
 
 PARALLEL_MAKE = ""
 
@@ -39,7 +43,15 @@ EXTRA_OEMAKE = " \
 
 do_install() {
     oe_runmake install DESTDIR="${D}"
+
+    if [ x"${@bb.utils.contains('DISTRO_FEATURES', 'storage-encryption', '1', '0', d)}" = x"1" ]; then
+        install -m 0500 ${S}/script/init.cryptfs ${D}
+    fi
 }
+
+FILES_${PN}-initramfs-script = "\
+    /init.cryptfs \
+"
 
 FILES_${PN} = "\
     ${sbindir} \

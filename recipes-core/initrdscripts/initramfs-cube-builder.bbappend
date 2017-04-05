@@ -1,23 +1,21 @@
+#
+# Copyright (C) 2016-2017 Wind River Systems, Inc.
+#
+
 FILESEXTRAPATHS_prepend := "${THISDIR}/files:"
 
 SRC_URI += "\
-    file://init.cryptfs \
     file://init.ima \
 "
 
 do_install_append() {
-    if [ x"${@bb.utils.contains('DISTRO_FEATURES', 'storage-encryption', '1', '0', d)}" = x"1" ]; then
-        install -m 0500 ${WORKDIR}/init.cryptfs ${D}
-    fi
-
     if [ x"${@bb.utils.contains('DISTRO_FEATURES', 'ima', '1', '0', d)}" = x"1" ]; then
         install -m 0500 ${WORKDIR}/init.ima ${D}
     fi
 }
 
 FILES_${PN} += " \
-    /init.cryptfs \
-    /init.ima \
+    ${@bb.utils.contains('DISTRO_FEATURES', 'ima', '/init.ima', '', d)} \
 "
 
 # Install the minimal stuffs only, and don't care how the external
