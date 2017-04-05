@@ -30,8 +30,8 @@ SRC_URI = " \
 	file://0010-Makefile-do-not-sign-the-efi-file.patch \
 	file://0011-Update-verification_method-if-the-loaded-image-is-si.patch \
 "
-SRCREV = "6dd948b57b129bf4e011804df24b4946da01e8c5"
-PV = "10+git${SRCPV}"
+SRCREV = "0fe4a80e9cb9f02ecbb1cebb73331011e3641ff4"
+PV = "11+git${SRCPV}"
 
 COMPATIBLE_HOST = '(i.86|x86_64).*-linux'
 
