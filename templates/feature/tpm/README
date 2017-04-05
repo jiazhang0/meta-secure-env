@@ -72,3 +72,40 @@ ready for use:
 
 Then, you can use the TPM for a specific need, such as key generation,
 sealing encrypted data, etc.
+
+openssl tpm engine for TPM 1.2
+==============================
+openssl-tpm-engine package provides tpm engine lib for openssl applications.
+It is an interface between openssl applications and TPM hardware.
+
+1. Wrap software key using the TPM engine
+(1). If tpm is not owned, run "tpm_takeownership -y -z".
+     This also set tpm SRK and Owner password to well-known key.
+     You can then run tpm_changeownerauth to set new SRK and Owner password.
+     To reset SRK and Owner password to well-known key, run "tpm_changeownerauth -r -s -o".
+
+(2). Generate tpm hardware key: (add -z for using well-known key)
+     $ create_tpm_key rootkey.pem [-z]
+
+(3). Wrap software key into TPM storage:
+     $ openssl genrsa -out softkey.pem 1024
+     $ create_tpm_key -w softkey.pem -s 1024 rootkey.pem [-z]
+
+2. Create a self-signed cert using the TPM engine
+(1). Generate a TPM key and write it to a file:
+ $ create_tpm_key <keyfilename>
+
+(2). Make the openssl certificate request:
+ $ openssl req -keyform engine -engine tpm -key <keyfilename> -new -x509 -days 365 -out <certfilename>
+
+3. How to use tpm engine lib
+The name of tpm engine library is libtpm.so.
+There is an enhencement to the original opensource code.
+Add an additional way to pass SRK passwork to libtpm.so,
+that is using environment variable "TPM_SRK_PW".
+For example:
+	env TPM_SRK_PW=xxx openssl s_server ...
+
+Note:
+  -"env TPM_SRK_PW=#WELLKNOWN#" is used to pass well-known key.
+  -Detail description about openssl-tpm-engine, please refer to the README in source code.
