@@ -42,17 +42,21 @@ user key store is located at $build/tmp/deploy/images/<machine>/user-keys/.
 
 Refer to feature/user-key-store-test/README for more details.
 
+TPM 1.2
+-------
+This feature enables Trusted Platform Module 1.2 support, including
+kernel option changes to enable tpm drivers, and picking up TPM 1.2 packages.
+
+Refer to feature/tpm/README for more details.
+
 TPM 2.0
 -------
-This feature enables Trusted Platform Module (TPM 2.0) support, including
+This feature enables Trusted Platform Module 2.0 support, including
 kernel option changes to enable tpm drivers, and picking up TPM 2.0 packages.
 
 Trusted Platform Module (TPM 2.0) is a microcontroller that stores keys,
 passwords, and digital certificates. A discrete TPM 2.0 offers the
 capabilities as part of the overall platform security requirements.
-
-Note: TPM 1.2 feature is added, though we don't provide the official support
-for it.
 
 Refer to feature/tpm2/README for more details.
 
@@ -93,6 +97,7 @@ updated hash if the file is modified) but refuse to load it if it doesn't. This
 provides some protection against offline tampering of the files.
 
 Refer to feature/ima/README for more details.
+
 
 Maintenance
 ===========
