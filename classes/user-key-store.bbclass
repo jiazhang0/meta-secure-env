@@ -29,6 +29,7 @@ def sign_efi_image(key, cert, input, output, d):
                      '--key', key, '--cert', cert,
                      '--output', output, input)))
     vprint("Signing %s with the key %s ..." % (input, key), d)
+    vprint("Running: %s" % cmd, d)
     try:
         result, _ = bb.process.run(cmd)
     except bb.process.ExecutionError:
@@ -131,6 +132,7 @@ def sel_sign(key, cert, input, d):
     cmd = (' '.join((d.getVar('STAGING_BINDIR_NATIVE', True) + '/selsign',
            '--key', key, '--cert', cert, input)))
     vprint("Signing %s with the key %s ..." % (input, key), d)
+    vprint("Running cmd: %s" % cmd, d)
     try:
         result, _ = bb.process.run(cmd)
     except bb.process.ExecutionError:
