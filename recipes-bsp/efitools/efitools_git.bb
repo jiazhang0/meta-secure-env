@@ -49,6 +49,11 @@ python do_prepare_signing_keys() {
         shutil.copyfile(dir + _ + '.pem', '${S}/' + _ + '.crt')
         shutil.copyfile(dir + _ + '.key', '${S}/' + _ + '.key')
 
+    # Make sure LockDown.efi contains the DB and KEK from Microsoft.
+    if "${@bb.utils.contains('DISTRO_FEATURES', 'msft', '1', '0', d)}" == '1':
+        shutil.copyfile('${MSFT_DB_CERT}', '${S}/DB.crt')
+        shutil.copyfile('${MSFT_KEK_CERT}', '${S}/KEK.crt')
+
     path = create_uefi_dbx(d)
     if path:
         with open('${S}/DBX.crt', 'w') as f:

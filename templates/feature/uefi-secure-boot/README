@@ -63,7 +63,8 @@ uses the following key pairs:
 
   * DBX
     This directory contains any number of X509 certificate enrolled to UEFI
-    BIOS, used to blacklist the revoked certificates.
+    BIOS, used to blacklist the revoked certificates. The revoked certificates
+    must be PEM-formatted.
 
 User Keys
 ---------
@@ -192,7 +193,8 @@ to avoid manual certificate provision for the user experience.
 This solution hints the shim loader needs to be signed by Microsoft. MOK secure
 boot can provide such a signed shim loader with some limits.
 
-See feature/mok-secure-boot for the details about MOK secure boot and shim.
+See feature/mok-secure-boot for the details about MOK secure boot and shim. See
+feature/msft about the use of shim binary signed by Microsoft.
 
 Work Flow For The First Boot
 ============================

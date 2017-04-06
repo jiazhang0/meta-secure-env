@@ -1,0 +1,34 @@
+MSFT
+====
+
+This layer is intended to resolve the gap introduced by the pre-provisioned
+machines employing the Microsoft Corporation UEFI CA 2011 against the
+bootloader built from source code without a proper Microsoft signature.
+
+We keep the faith that everything is built from source codes, so it is
+necessary to introduce another template to place the shim binary signed by
+Microsoft and override the one built from source code at a moment to align
+up the out-of-box requirement. See the section "Out-of-box Experience" in
+uefi-secire-boot/README.
+
+If this template is configured, the generated rootfs tarball and RPM will
+contain such a pre-signed shim binary rather than the one built from source
+code.
+
+Note:
+The pre-signed shim binary embeds a WoSign EV certificate as vendor certificate
+used to accelerate the progress of Microsoft signing. It is not used to
+authenticate grub2 and kernel; This binary also includes a sample shim
+certificate used for development and demonstration. Therefore, don't use this
+template in your product.
+
+Build
+=====
+
+In order to enable this feature, add the path to
+feature/msft/template.conf to the init script.
+
+Dependency
+==========
+
+This feature depends on feature/mok-secure-boot.

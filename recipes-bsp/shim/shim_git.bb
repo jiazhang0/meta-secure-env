@@ -16,6 +16,11 @@ SECTION = "bootloaders"
 LICENSE = "shim"
 LIC_FILES_CHKSUM = "file://COPYRIGHT;md5=b92e63892681ee4e8d27e7a7e87ef2bc"
 PR = "r0"
+
+COMPATIBLE_HOST = '(i.86|x86_64).*-linux'
+
+inherit deploy user-key-store
+
 SRC_URI = " \
 	git://github.com/rhinstaller/shim.git \
 	file://0001-shim-allow-to-verify-sha1-digest-for-Authenticode.patch \
@@ -30,6 +35,10 @@ SRC_URI = " \
 	file://0010-Makefile-do-not-sign-the-efi-file.patch \
 	file://0011-Update-verification_method-if-the-loaded-image-is-si.patch \
 "
+SRC_URI_append_x86-64 = " \
+       ${@bb.utils.contains('DISTRO_FEATURES', 'msft', 'file://shim${EFI_ARCH}.efi.signed file://LICENSE' if uks_signing_model(d) == 'sample' else '', '', d)} \
+"
+
 SRCREV = "0fe4a80e9cb9f02ecbb1cebb73331011e3641ff4"
 PV = "11+git${SRCPV}"
 
@@ -69,14 +78,31 @@ PARALLEL_MAKE = ""
 EFI_TARGET = "/boot/efi/EFI/BOOT"
 FILES_${PN} += "${EFI_TARGET}"
 
+MSFT = "${@bb.utils.contains('DISTRO_FEATURES', 'msft', '1', '0', d)}"
+
 # Prepare the signing certificate and keys
 python do_prepare_signing_keys() {
     shim_prepare_sb_keys(d)
+
+    # Replace the vendor certificate with EV certificate for speeding up
+    # the progress of MSFT signing.
+    if "${MSFT}" == "1" and uks_signing_model(d) == "sample":
+        import shutil
+        shutil.copyfile('${EV_CERT}', '${WORKDIR}/vendor_cert.cer')
 }
 addtask prepare_signing_keys after do_check_user_keys before do_compile
 
 python do_sign() {
-    shim_sb_sign('${S}/shim${EFI_ARCH}.efi', '${B}/shim${EFI_ARCH}.efi.signed', d)
+    # The pre-signed shim binary will override the one built from the
+    # scratch.
+    pre_signed = '${WORKDIR}/shim${EFI_ARCH}.efi.signed'
+    dst = '${B}/shim${EFI_ARCH}.efi.signed'
+    if "${MSFT}" == "1" and os.path.exists(pre_signed):
+        import shutil
+        shutil.copyfile(pre_signed, dst)
+    else:
+        shim_sb_sign('${S}/shim${EFI_ARCH}.efi', dst, d)
+
     sb_sign('${S}/mm${EFI_ARCH}.efi', '${B}/mm${EFI_ARCH}.efi.signed', d)
     sb_sign('${S}/fb${EFI_ARCH}.efi', '${B}/fb${EFI_ARCH}.efi.signed', d)
 }
