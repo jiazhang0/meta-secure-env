@@ -37,6 +37,7 @@ EXTRA_OEMAKE = " \
     CC="${CC}" \
     EXTRA_CFLAGS="${CFLAGS}" \
     EXTRA_LDFLAGS="${LDFLAGS}" \
+    SIGNATURELET_DIR="${STAGING_LIBDIR_NATIVE}/signaturelet" \
 "
 
 do_install() {
