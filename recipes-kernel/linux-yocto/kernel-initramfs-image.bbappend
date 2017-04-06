@@ -4,6 +4,8 @@
 
 inherit user-key-store deploy
 
+do_install[depends] += "${@'${INITRAMFS_IMAGE}:do_rootfs' if '${INITRAMFS_IMAGE}' else ''}"
+
 fakeroot python do_sign() {
     initramfs = None
 
