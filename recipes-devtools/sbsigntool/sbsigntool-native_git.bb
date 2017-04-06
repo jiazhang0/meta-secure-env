@@ -13,6 +13,7 @@ SRC_URI = "git://kernel.ubuntu.com/jk/sbsigntool \
     file://Fix-for-multi-sign.patch \
     file://sbsign-add-x-option-to-avoid-overwrite-existing-sign.patch \
     file://fix-mixed-implicit-and-normal-rules.patch;apply=0 \
+    file://image-fix-the-segment-fault-caused-by-the-uninitiali.patch \
 "
 
 SRCREV="951ee95a301674c046f55330cd7460e1314deff2"
