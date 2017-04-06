@@ -1,0 +1,29 @@
+From fdeb3ccb9b3943b95262da9e5b59e3745b3f12da Mon Sep 17 00:00:00 2001
+From: Yunguo Wei <yunguo.wei@windriver.com>
+Date: Thu, 30 Mar 2017 15:57:36 +0800
+Subject: [PATCH] Enable configuration for gpg digest algorithm
+
+Signed-off-by: Yunguo Wei <yunguo.wei@windriver.com>
+---
+ macros/macros.in | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/macros/macros.in b/macros/macros.in
+index c390266..14847f7 100644
+--- a/macros/macros.in
++++ b/macros/macros.in
+@@ -509,8 +509,11 @@ $_arbitrary_tags_tests	Foo:Bar
+ #%__pgp5_check_password_cmd	%{__pgp} \
+ #	pgps +batchmode=on +verbose=0 +armor=off "%{_pgp_name}" -f
+ 
++%_gpg_digest_algo sha1
++
+ %__gpg_sign_cmd			%{__gpg} \
+ 	gpg --batch --no-verbose --no-armor --passphrase-fd 3 --no-secmem-warning \
++        %{?_gpg_digest_algo:--digest-algo %{_gpg_digest_algo}} \
+ 	-u "%{_gpg_name}" -sbo %{__signature_filename} %{__plaintext_filename}
+ #%__pgp_sign_cmd			%{__pgp} \
+ #	pgp +batchmode=on +verbose=0 +armor=off \
+-- 
+2.11.0
+

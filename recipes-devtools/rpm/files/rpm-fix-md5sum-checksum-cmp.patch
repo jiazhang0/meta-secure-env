@@ -1,0 +1,31 @@
+rpmdb/header.c: The RPM_BIN_TYPE may load incorrectly in some cases
+
+When processing the RPM_BIN_TYPE the size count should be the same as the
+entries "info.count".  The info.count is normally the same size as the length,
+but is not in some cases.  Change the count to use the info.count
+
+This resolves an issue noticed when verifying the MD5 digest on a package
+using rpm -Kv.
+
+MD5 digest: BAD Expected(1219e7d795b80078ebc838eea2567c3d00) != (1219e7d795b80078ebc838eea2567c3d) 
+
+Change suggested by Jeff Johnson.
+
+[ Upstream-status: Pending ]
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+Signed-off-by: Randy MacLeod <Randy.MacLeod@windriver.com>
+
+Index: rpm-5.4.9/rpmdb/header.c
+===================================================================
+--- rpm-5.4.9.orig/rpmdb/header.c
++++ rpm-5.4.9/rpmdb/header.c
+@@ -1491,7 +1491,7 @@ assert(entry->info.offset <= 0);		/* XXX
+ 
+ 	    (void) memcpy(pe + ril, dataStart, rdl);
+ 	} else {
+-	    count = (rpmTagCount)entry->length;
++	    count = (rpmTagCount)entry->info.count;
+ 	    he->p.ptr = (!minMem
+ 		? memcpy(DRD_xmalloc(count), entry->data, count)
+ 		: entry->data);

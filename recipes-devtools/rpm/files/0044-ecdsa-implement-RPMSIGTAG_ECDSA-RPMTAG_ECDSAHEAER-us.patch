@@ -1,0 +1,572 @@
+From 6dc442c8aeace2f69129bd5066ec614971b189a0 Mon Sep 17 00:00:00 2001
+From: jbj <jbj>
+Date: Mon, 5 May 2014 19:44:08 +0000
+Subject: [PATCH 30/46] - ecdsa: implement RPMSIGTAG_ECDSA/RPMTAG_ECDSAHEAER
+ use.
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+Signed-off-by: Randy MacLeod <Randy.MacLeod@windriver.com>
+---
+ lib/rpmchecksig.c  |  16 ++++-
+ python/rpmmodule.c |   2 +
+ python/rpmts-py.c  |   5 ++
+ rpmdb/hdrNVR.c     |   6 +-
+ rpmdb/hdrfmt.c     |  27 +--------
+ rpmdb/package.c    |  18 ++++++
+ rpmdb/pkgio.c      |  38 ++++++++++--
+ rpmdb/signature.c  | 168 +++++++++++++++++++++++++++++++++++++++++++++++++++--
+ 8 files changed, 244 insertions(+), 36 deletions(-)
+
+diff --git a/lib/rpmchecksig.c b/lib/rpmchecksig.c
+index 58f6483..e55915a 100644
+--- a/lib/rpmchecksig.c
++++ b/lib/rpmchecksig.c
+@@ -342,7 +342,7 @@ if (sigh != NULL) {
+ 	    /* Nuke all the signature tags. */
+ 	    static const rpmuint32_t sigs[] =
+ 		{ RPMSIGTAG_GPG, RPMSIGTAG_PGP5, RPMSIGTAG_PGP,
+-		  RPMSIGTAG_DSA, RPMSIGTAG_RSA };
++		  RPMSIGTAG_DSA, RPMSIGTAG_RSA, RPMSIGTAG_ECDSA };
+ 	    size_t nsigs = sizeof(sigs) / sizeof(sigs[0]);
+ 	    for (i = 0; i < (int)nsigs; i++) {
+ 		he->tag = (rpmTag)sigs[i];
+@@ -363,6 +363,12 @@ if (sigh != NULL) {
+ 	    switch (sigtag) {
+ 	    default:
+ 		/*@switchbreak@*/ break;
++	    case RPMSIGTAG_ECDSA:
++#ifdef	NOTYET		/* XXX FIXME: W2DO? */
++		he->tag = (rpmTag)RPMSIGTAG_GPG;
++		xx = headerDel(sigh, he, 0);
++#endif
++		/*@switchbreak@*/ break;
+ 	    case RPMSIGTAG_DSA:
+ 		he->tag = (rpmTag)RPMSIGTAG_GPG;
+ 		xx = headerDel(sigh, he, 0);
+@@ -1111,6 +1117,8 @@ pgpPkt pp = (pgpPkt) alloca(sizeof(*pp));
+ 		she->tag = (rpmTag) RPMSIGTAG_DSA;
+ 	    else if (headerIsEntry(sigh, (rpmTag) RPMSIGTAG_RSA))
+ 		she->tag = (rpmTag) RPMSIGTAG_RSA;
++	    else if (headerIsEntry(sigh, (rpmTag) RPMSIGTAG_ECDSA))
++		she->tag = (rpmTag) RPMSIGTAG_ECDSA;
+ 	}
+ 	if (she->tag == 0 && !nodigests) {
+ 	    if (headerIsEntry(sigh, (rpmTag) RPMSIGTAG_MD5))
+@@ -1174,6 +1182,7 @@ assert(she->p.ptr != NULL);
+ 	    switch ((rpmSigTag)she->tag) {
+ 	    case RPMSIGTAG_RSA:
+ 	    case RPMSIGTAG_DSA:
++	    case RPMSIGTAG_ECDSA:
+ 		if (nosignatures)
+ 		     continue;
+ 
+@@ -1226,6 +1235,8 @@ assert(she->p.ptr != NULL);
+ 		case RPMSIGTAG_DSA:
+ 		    b = stpcpy(b, "(SHA1) DSA ");
+ 		    /*@switchbreak@*/ break;
++		case RPMSIGTAG_ECDSA:
++		    b = stpcpy(b, "ECDSA ");
+ 		default:
+ 		    b = stpcpy(b, "?UnknownSignatureType? ");
+ 		    /*@switchbreak@*/ break;
+@@ -1250,6 +1261,9 @@ assert(she->p.ptr != NULL);
+ 		case RPMSIGTAG_DSA:
+ 		    b = stpcpy(b, "(sha1) dsa ");
+ 		    /*@switchbreak@*/ break;
++		case RPMSIGTAG_ECDSA:
++		    b = stpcpy(b, "ecdsa ");
++		    /*@switchbreak@*/ break;
+ 		default:
+ 		    b = stpcpy(b, "??? ");
+ 		    /*@switchbreak@*/ break;
+diff --git a/python/rpmmodule.c b/python/rpmmodule.c
+index 24d8d27..f2ce941 100644
+--- a/python/rpmmodule.c
++++ b/python/rpmmodule.c
+@@ -602,10 +602,12 @@ void init_rpm(void)
+     REGISTER_ENUM(RPMVSF_NOMD5HEADER);
+     REGISTER_ENUM(RPMVSF_NODSAHEADER);
+     REGISTER_ENUM(RPMVSF_NORSAHEADER);
++    REGISTER_ENUM(RPMVSF_NOECDSAHEADER);
+     REGISTER_ENUM(RPMVSF_NOSHA1);
+     REGISTER_ENUM(RPMVSF_NOMD5);
+     REGISTER_ENUM(RPMVSF_NODSA);
+     REGISTER_ENUM(RPMVSF_NORSA);
++    REGISTER_ENUM(RPMVSF_NOECDSA);
+ 
+     REGISTER_ENUM(TR_ADDED);
+     REGISTER_ENUM(TR_REMOVED);
+diff --git a/python/rpmts-py.c b/python/rpmts-py.c
+index 41bdf50..ce81802 100644
+--- a/python/rpmts-py.c
++++ b/python/rpmts-py.c
+@@ -67,9 +67,12 @@ extern int _rpmts_debug;
+  * -    rpm.RPMVSF_NEEDPAYLOAD	if not set, check header+payload (if possible)
+  * -	rpm.RPMVSF_NOSHA1HEADER	if set, don't check header SHA1 digest
+  * -	rpm.RPMVSF_NODSAHEADER	if set, don't check header DSA signature
++ * -	rpm.RPMVSF_NORSAHEADER	if set, don't check header RSA signature
++ * -	rpm.RPMVSF_NOECDSAHEADER if set, don't check header ECDSA signature
+  * -	rpm.RPMVSF_NOMD5	if set, don't check header+payload MD5 digest
+  * -	rpm.RPMVSF_NODSA	if set, don't check header+payload DSA signature
+  * -	rpm.RPMVSF_NORSA	if set, don't check header+payload RSA signature
++ * -	rpm.RPMVSF_NOECDSA	if set, don't check header+payload ECDSA signature
+  *
+  * A rpm.ts object has the following methods:
+  *
+@@ -1495,9 +1498,11 @@ static struct PyMethodDef rpmts_methods[] = {
+     rpm.RPMVSF_NOSHA1HEADER  if set, don't check header SHA1 digest\n\
+     rpm.RPMVSF_NODSAHEADER   if set, don't check header DSA signature\n\
+     rpm.RPMVSF_NORSAHEADER   if set, don't check header RSA signature\n\
++    rpm.RPMVSF_NOECDSAHEADER if set, don't check header ECDSA signature\n\
+     rpm.RPMVSF_NOMD5         if set, don't check header+payload MD5 digest\n\
+     rpm.RPMVSF_NODSA         if set, don't check header+payload DSA signature\n\
+     rpm.RPMVSF_NORSA         if set, don't check header+payload RSA signature\n\
++    rpm.RPMVSF_NOECDSA       if set, don't check header+payload ECDSA signature\n\
+ " },
+  {"setColor",(PyCFunction) rpmts_SetColor,	METH_VARARGS|METH_KEYWORDS,
+ 	NULL },
+diff --git a/rpmdb/hdrNVR.c b/rpmdb/hdrNVR.c
+index 4f5fbdc..440bd88 100644
+--- a/rpmdb/hdrNVR.c
++++ b/rpmdb/hdrNVR.c
+@@ -264,8 +264,9 @@ void headerMergeLegacySigs(Header h, const Header sigh)
+ 	    he->tag = RPMTAG_ARCHIVESIZE;
+ 	    /*@switchbreak@*/ break;
+ 	case RPMSIGTAG_SHA1:
+-	case RPMSIGTAG_DSA:
+ 	case RPMSIGTAG_RSA:
++	case RPMSIGTAG_DSA:
++	case RPMSIGTAG_ECDSA:
+ 	default:
+ 	    /* Skip all unknown tags that are not in the signature tag range. */
+ 	    if (!(he->tag >= HEADER_SIGBASE && he->tag < HEADER_TAGBASE))
+@@ -335,8 +336,9 @@ Header headerRegenSigHeader(const Header h, int noArchiveSize)
+ 	    he->tag = (rpmTag) RPMSIGTAG_PAYLOADSIZE;
+ 	    /*@switchbreak@*/ break;
+ 	case RPMTAG_SHA1HEADER:
+-	case RPMTAG_DSAHEADER:
+ 	case RPMTAG_RSAHEADER:
++	case RPMTAG_DSAHEADER:
++	case RPMTAG_ECDSAHEADER:
+ 	default:
+ 	    /* Skip all unknown tags that are not in the signature tag range. */
+ 	    if (!(he->tag >= HEADER_SIGBASE && he->tag < HEADER_TAGBASE))
+diff --git a/rpmdb/hdrfmt.c b/rpmdb/hdrfmt.c
+index 9afe76c..2b20c9c 100644
+--- a/rpmdb/hdrfmt.c
++++ b/rpmdb/hdrfmt.c
+@@ -1409,33 +1409,12 @@ assert(ix == 0);
+ 	    nb += 100;
+ 	    val = t = xrealloc(val, nb + 1);
+ 
+-	    switch (sigp->pubkey_algo) {
+-	    case PGPPUBKEYALGO_DSA:
+-		t = stpcpy(t, "DSA");
+-		break;
+-	    case PGPPUBKEYALGO_RSA:
+-		t = stpcpy(t, "RSA");
+-		break;
+-	    default:
+-		(void) snprintf(t, nb - (t - val), "%u", (unsigned)sigp->pubkey_algo);
+-		t += strlen(t);
+-		break;
+-	    }
++	    t = stpcpy(t, _pgpPubkeyAlgo2Name(sigp->pubkey_algo));
+ 	    if (t + 5 >= val + nb)
+ 		goto again;
++
+ 	    *t++ = '/';
+-	    switch (sigp->hash_algo) {
+-	    case PGPHASHALGO_MD5:
+-		t = stpcpy(t, "MD5");
+-		break;
+-	    case PGPHASHALGO_SHA1:
+-		t = stpcpy(t, "SHA1");
+-		break;
+-	    default:
+-		(void) snprintf(t, nb - (t - val), "%u", (unsigned)sigp->hash_algo);
+-		t += strlen(t);
+-		break;
+-	    }
++	    t = stpcpy(t, _pgpHashAlgo2Name(sigp->hash_algo));
+ 	    if (t + strlen (", ") + 1 >= val + nb)
+ 		goto again;
+ 
+diff --git a/rpmdb/package.c b/rpmdb/package.c
+index be50847..6cdd446 100644
+--- a/rpmdb/package.c
++++ b/rpmdb/package.c
+@@ -188,6 +188,9 @@ assert(dig != NULL);
+     she->tag = (rpmTag)0;
+     opx = (rpmtsOpX)0;
+     vsflags = pgpDigVSFlags;
++    if (_chk(RPMVSF_NOECDSAHEADER) && headerIsEntry(sigh, (rpmTag)RPMSIGTAG_ECDSA)) {
++	she->tag = (rpmTag)RPMSIGTAG_ECDSA;
++    } else
+     if (_chk(RPMVSF_NODSAHEADER) && headerIsEntry(sigh, (rpmTag)RPMSIGTAG_DSA)) {
+ 	she->tag = (rpmTag)RPMSIGTAG_DSA;
+     } else
+@@ -306,6 +309,19 @@ assert(0);
+ 	}
+ 	xx = hBlobDigest(h, dig, dig->signature.hash_algo, &dig->hdsa);
+ 	break;
++    case RPMSIGTAG_ECDSA:
++	/* Parse the parameters from the OpenPGP packets that will be needed. */
++	xx = pgpPktLen(she->p.ui8p, she->c, pp);
++	xx = rpmhkpLoadSignature(NULL, dig, pp);
++	if (dig->signature.version != 3 && dig->signature.version != 4) {
++	    rpmlog(RPMLOG_ERR,
++		_("skipping package %s with unverifiable V%u signature\n"), 
++		fn, dig->signature.version);
++	    rc = RPMRC_FAIL;
++	    goto exit;
++	}
++	xx = hBlobDigest(h, dig, dig->signature.hash_algo, &dig->hecdsa);
++	break;
+     case RPMSIGTAG_SHA1:
+ 	/* XXX dig->hsha? */
+ 	xx = hBlobDigest(h, dig, PGPHASHALGO_SHA1, &dig->hdsa);
+@@ -386,6 +402,7 @@ exit:
+ 	    /*@fallthrough@*/
+ 	case RPMSIGTAG_RSA:
+ 	case RPMSIGTAG_DSA:
++	case RPMSIGTAG_ECDSA:
+ 	    break;
+ 	}
+     }
+@@ -394,6 +411,7 @@ exit:
+     rpmtsCleanDig(ts);
+     (void)headerFree(sigh);
+     sigh = NULL;
++
+     return rc;
+ }
+ /*@=mods@*/
+diff --git a/rpmdb/pkgio.c b/rpmdb/pkgio.c
+index f6a9f5b..7818929 100644
+--- a/rpmdb/pkgio.c
++++ b/rpmdb/pkgio.c
+@@ -206,7 +206,7 @@ fprintf(stderr, "*** free pkt %p[%d] id %08x %08x\n", hkp->pkt, hkp->pktlen, pgp
+ 	memset(hkp->signid, 0, sizeof(hkp->signid));
+     }
+ 
+-    /* Has this pubkey failled a previous lookup? */
++    /* Has this pubkey failed a previous lookup? */
+     if (hkp->pkt == NULL && awol != NULL
+      && rpmbfChk(awol, sigp->signid, sizeof(sigp->signid)))
+ 	goto leave;
+@@ -359,6 +359,7 @@ hkp->npkts = 0;
+     memcpy(pubp->signid, hkp->keyid, sizeof(pubp->signid)); /* XXX useless */
+ 
+     /* Validate pubkey self-signatures. */
++    /* XXX need at least 3 packets to validate a pubkey */
+     if (validate) {
+ 	rpmRC rc = rpmhkpValidate(hkp, NULL);
+ 	switch (rc) {
+@@ -384,7 +385,7 @@ fprintf(stderr, "*** rpmhkpValidate: validate %d rc %d\n", validate, rc);
+ 
+ #ifdef	DYING
+ if (_rpmhkp_debug)
+-_rpmhkpDumpDig(__FUNCTION__, dig);
++_rpmhkpDumpDig(__FUNCTION__, dig, NULL);
+ #endif
+ 
+     /* Do the parameters match the signature? */
+@@ -408,9 +409,7 @@ fprintf(stderr, "\t%s: rpmku  %p[%u]\n", __FUNCTION__, hkp->pkt, (unsigned) hkp-
+ 
+ 	if (pubkeysource)
+ 	    rpmlog(RPMLOG_DEBUG, "========== %s pubkey id %08x %08x (%s)\n",
+-		(sigp->pubkey_algo == (rpmuint8_t)PGPPUBKEYALGO_DSA ? "DSA" :
+-		(sigp->pubkey_algo == (rpmuint8_t)PGPPUBKEYALGO_RSA ? "RSA" :
+-			"???")),
++		_pgpPubkeyAlgo2Name(sigp->pubkey_algo),
+ 		pgpGrab(sigp->signid, 4), pgpGrab(sigp->signid+4, 4),
+ 		pubkeysource);
+ 
+@@ -1232,6 +1231,16 @@ fprintf(stderr, "--> headerCheck(%p, %p[%u], %p)\n", dig, uh, (unsigned) uc, msg
+ 	    *info = entry->info;	/* structure assignment */
+ 	    siglen = info->count;
+ 	    /*@switchbreak@*/ break;
++	case RPMTAG_ECDSAHEADER:
++	    if (vsflags & RPMVSF_NOECDSAHEADER)
++		/*@switchbreak@*/ break;
++	    if (entry->info.type != RPM_BIN_TYPE) {
++		(void) snprintf(buf, sizeof(buf), _("hdr ECDSA: BAD, not binary"));
++		goto exit;
++	    }
++	    *info = entry->info;	/* structure assignment */
++	    siglen = info->count;
++	    /*@switchbreak@*/ break;
+ 	default:
+ 	    /*@switchbreak@*/ break;
+ 	}
+@@ -1321,6 +1330,25 @@ assert(dig != NULL);
+ 			regionEnd, ril, &dig->hdsa);
+ 
+ 	break;
++    case RPMTAG_ECDSAHEADER:
++	/* Parse the parameters from the OpenPGP packets that will be needed. */
++	pleft = info->count;
++	xx = pgpPktLen((const rpmuint8_t *)sig, pleft, pp);
++	xx = rpmhkpLoadSignature(NULL, dig, pp);
++	if (dig->signature.version != (rpmuint8_t)3
++	 && dig->signature.version != (rpmuint8_t)4)
++	{
++	    rpmlog(RPMLOG_ERR,
++		_("skipping header with unverifiable V%u signature\n"),
++		(unsigned) dig->signature.version);
++	    rc = RPMRC_FAIL;
++	    goto exit;
++	}
++
++	xx = hBlobDigest(uh, dig, dig->signature.hash_algo,
++			regionEnd, ril, &dig->hecdsa);
++
++	break;
+     case RPMTAG_SHA1HEADER:
+ 
+ 	/* XXX dig->hsha? */
+diff --git a/rpmdb/signature.c b/rpmdb/signature.c
+index d7cc002..2cd28a1 100644
+--- a/rpmdb/signature.c
++++ b/rpmdb/signature.c
+@@ -264,6 +264,7 @@ static int makeGPGSignature(const char * file, rpmSigTag * sigTagp,
+     sigp = pgpGetSignature(dig);
+ 
+     /* Identify the type of signature being returned. */
++    /* XXX FIXME: RPMSIGTAG{DSA,RSA} are interchangeable. */
+     switch (*sigTagp) {
+     default:
+ assert(0);	/* XXX never happens. */
+@@ -272,14 +273,16 @@ assert(0);	/* XXX never happens. */
+     case RPMSIGTAG_MD5:
+     case RPMSIGTAG_SHA1:
+ 	break;
++    case RPMSIGTAG_RSA:
++	if (sigp->pubkey_algo == (rpmuint8_t)PGPPUBKEYALGO_DSA)
++	    *sigTagp = RPMSIGTAG_DSA;
++	break;
+     case RPMSIGTAG_DSA:
+ 	/* XXX check hash algorithm too? */
+ 	if (sigp->pubkey_algo == (rpmuint8_t)PGPPUBKEYALGO_RSA)
+ 	    *sigTagp = RPMSIGTAG_RSA;
+ 	break;
+-    case RPMSIGTAG_RSA:
+-	if (sigp->pubkey_algo == (rpmuint8_t)PGPPUBKEYALGO_DSA)
+-	    *sigTagp = RPMSIGTAG_DSA;
++    case RPMSIGTAG_ECDSA:
+ 	break;
+     }
+ 
+@@ -417,6 +420,47 @@ assert(0);	/* XXX never happens. */
+ 	    goto exit;
+ 	ret = 0;
+ 	break;
++    case RPMSIGTAG_ECDSA:	/* XXX necessary when gnupg2 supports ECDSA */
++	fd = Fopen(file, "r.fdio");
++	if (fd == NULL || Ferror(fd))
++	    goto exit;
++	{   const char item[] = "Header";
++	    msg = NULL;
++	    rc = rpmpkgRead(item, fd, &h, &msg);
++	    if (rc != RPMRC_OK) {
++		rpmlog(RPMLOG_ERR, "%s: %s: %s\n", fn, item, msg);
++		msg = _free(msg);
++		goto exit;
++	    }
++	    msg = _free(msg);
++	}
++	(void) Fclose(fd);	fd = NULL;
++
++	if (rpmTempFile(NULL, &fn, &fd))
++	    goto exit;
++	{   const char item[] = "Header";
++	    msg = NULL;
++	    rc = rpmpkgWrite(item, fd, h, &msg);
++	    if (rc != RPMRC_OK) {
++		rpmlog(RPMLOG_ERR, "%s: %s: %s\n", fn, item, msg);
++		msg = _free(msg);
++		goto exit;
++	    }
++	    msg = _free(msg);
++	}
++	(void) Fclose(fd);	fd = NULL;
++
++	if (makeGPGSignature(fn, &sigTag, &pkt, &pktlen, passPhrase))
++	    goto exit;
++	he->tag = (rpmTag) sigTag;
++	he->t = RPM_BIN_TYPE;
++	he->p.ptr = pkt;
++	he->c = pktlen;
++	xx = headerPut(sigh, he, 0);
++	if (!xx)
++	    goto exit;
++	ret = 0;
++	break;
+     }
+ 
+ exit:
+@@ -477,9 +521,10 @@ assert(0);	/* XXX never happens. */
+     case RPMSIGTAG_GPG:
+ 	ret = makeHDRSignature(sigh, file, RPMSIGTAG_DSA, passPhrase);
+ 	break;
++    case RPMSIGTAG_SHA1:
+     case RPMSIGTAG_RSA:
+     case RPMSIGTAG_DSA:
+-    case RPMSIGTAG_SHA1:
++    case RPMSIGTAG_ECDSA:
+ 	ret = makeHDRSignature(sigh, file, sigTag, passPhrase);
+ 	break;
+     }
+@@ -942,6 +987,112 @@ fprintf(stderr, "<-- %s(%p,%p,%p) res %d %s\n", __FUNCTION__, dig, t, hdsa, res,
+     return res;
+ }
+ 
++/**
++ * Verify ECDSA signature.
++ * @param dig		container
++ * @retval t		verbose success/failure text
++ * @param hecdsa		ECDSA digest context
++ * @return 		RPMRC_OK on success
++ */
++static rpmRC
++verifyECDSA(pgpDig dig, /*@out@*/ char * t, /*@null@*/ DIGEST_CTX hecdsa)
++	/*@globals internalState @*/
++	/*@modifies dig, *t, internalState */
++{
++    const void * sig = pgpGetSig(dig);
++#ifdef	NOTYET
++    rpmuint32_t siglen = pgpGetSiglen(dig);
++#endif
++    pgpDigParams sigp = pgpGetSignature(dig);
++    rpmRC res;
++    int xx;
++
++if (_rpmhkp_debug)
++fprintf(stderr, "--> %s(%p,%p,%p) sig %p sigp %p\n", __FUNCTION__, dig, t, hecdsa, sig, sigp);
++
++assert(dig != NULL);
++assert(hecdsa != NULL);
++assert(sigp != NULL);
++assert(sigp->pubkey_algo == (rpmuint8_t)PGPPUBKEYALGO_ECDSA);
++assert(sigp->hash_algo == (rpmuint8_t)rpmDigestAlgo(hecdsa));
++assert(pgpGetSigtag(dig) == RPMSIGTAG_ECDSA);
++assert(sig != NULL);
++
++    *t = '\0';
++    if (dig != NULL && dig->hecdsa == hecdsa)
++	t = stpcpy(t, _("Header "));
++
++    /* Identify the signature version. */
++    *t++ = 'V';
++    switch (sigp->version) {
++    case 3:    *t++ = '3';     break;
++    case 4:    *t++ = '4';     break;
++    }
++
++    /* Identify the ECDSA/hash. */
++    {   const char * hashname = rpmDigestName(hecdsa);
++	t = stpcpy(t, " ECDSA");
++	if (strcmp(hashname, "UNKNOWN") && strcmp(hashname, "SHA1")) {
++	    *t++ = '/';
++	    t = stpcpy(t, hashname);
++	}
++    }
++    t = stpcpy(t, _(" signature: "));
++
++    {	rpmop op = (rpmop)pgpStatsAccumulator(dig, 10);	/* RPMTS_OP_DIGEST */
++	DIGEST_CTX ctx = rpmDigestDup(hecdsa);
++
++	(void) rpmswEnter(op, 0);
++	if (sigp->hash != NULL)
++	    xx = rpmDigestUpdate(ctx, sigp->hash, sigp->hashlen);
++
++	if (sigp->version == (rpmuint8_t) 4) {
++	    rpmuint8_t trailer[6];
++	    trailer[0] = sigp->version;
++	    trailer[1] = (rpmuint8_t)0xff;
++	    trailer[2] = (sigp->hashlen >> 24);
++	    trailer[3] = (sigp->hashlen >> 16);
++	    trailer[4] = (sigp->hashlen >>  8);
++	    trailer[5] = (sigp->hashlen      );
++	    xx = rpmDigestUpdate(ctx, trailer, sizeof(trailer));
++	}
++	(void) rpmswExit(op, sigp->hashlen);
++	if (op != NULL) op->count--;	/* XXX one too many */
++
++	if (pgpImplSetECDSA(ctx, dig, sigp)) {
++	    res = RPMRC_FAIL;
++	    goto exit;
++	}
++    }
++
++    /* Retrieve the matching public key. */
++    res = (rpmRC) pgpFindPubkey(dig);
++    if (res != RPMRC_OK)
++	goto exit;
++
++    /* Verify the ECDSA signature. */
++    {	rpmop op = (rpmop)pgpStatsAccumulator(dig, 11); /* RPMTS_OP_SIGNATURE */
++	(void) rpmswEnter(op, 0);
++	xx = pgpImplVerify(dig);
++	res = (xx ? RPMRC_OK : RPMRC_FAIL);
++	(void) rpmswExit(op, 0);
++    }
++
++exit:
++    /* Identify the pubkey fingerprint. */
++    t = stpcpy(t, rpmSigString(res));
++    if (sigp != NULL) {
++	t = stpcpy(t, ", key ID ");
++	(void) pgpHexCvt(t, sigp->signid+4, sizeof(sigp->signid)-4);
++	t += strlen(t);
++    }
++
++if (_rpmhkp_debug)
++fprintf(stderr, "<-- %s(%p,%p,%p) res %d %s\n", __FUNCTION__, dig, t, hecdsa, res, t);
++
++    return res;
++}
++
+ rpmRC
+ rpmVerifySignature(void * _dig, char * result)
+ {
+@@ -951,6 +1102,7 @@ rpmVerifySignature(void * _dig, char * result)
+     rpmSigTag sigtag = (rpmSigTag) pgpGetSigtag(dig);
+     rpmRC res;
+ pgpDigParams pubp = NULL;
++pgpDigParams sigp = NULL;
+ 
+ if (_rpmhkp_debug)
+ fprintf(stderr, "--> %s(%p,%p) sig %p[%u]\n", __FUNCTION__, _dig, result, sig, siglen);
+@@ -962,6 +1114,7 @@ fprintf(stderr, "--> %s(%p,%p) sig %p[%u]\n", __FUNCTION__, _dig, result, sig, s
+     }
+ 
+ pubp = pgpGetPubkey(dig);
++sigp = pgpGetSignature(dig);
+     switch (sigtag) {
+     case RPMSIGTAG_SIZE:
+ 	res = verifySize(dig, result);
+@@ -975,12 +1128,19 @@ pubp = pgpGetPubkey(dig);
+ 	break;
+     case RPMSIGTAG_RSA:
+ pubp->pubkey_algo = PGPPUBKEYALGO_RSA;
++sigp->pubkey_algo = PGPPUBKEYALGO_RSA;
+ 	res = verifyRSA(dig, result, dig->hrsa);
+ 	break;
+     case RPMSIGTAG_DSA:
+ pubp->pubkey_algo = PGPPUBKEYALGO_DSA;
++sigp->pubkey_algo = PGPPUBKEYALGO_DSA;
+ 	res = verifyDSA(dig, result, dig->hdsa);
+ 	break;
++    case RPMSIGTAG_ECDSA:
++pubp->pubkey_algo = PGPPUBKEYALGO_ECDSA;
++sigp->pubkey_algo = PGPPUBKEYALGO_ECDSA;
++	res = verifyECDSA(dig, result, dig->hecdsa);
++	break;
+     default:
+ 	sprintf(result, _("Signature: UNKNOWN (%u)\n"), (unsigned)sigtag);
+ 	res = RPMRC_NOTFOUND;
+-- 
+2.0.1
+

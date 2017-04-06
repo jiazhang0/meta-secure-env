@@ -1,0 +1,26 @@
+From 9f1cbf9b15e76e75fc64f2a51a2e527669486201 Mon Sep 17 00:00:00 2001
+From: jbj <jbj>
+Date: Wed, 14 May 2014 23:16:12 +0000
+Subject: [PATCH 44/46] - coverity #1214085.
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+Signed-off-by: Randy MacLeod <Randy.MacLeod@windriver.com>
+---
+ rpmdb/hdrfmt.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/rpmdb/hdrfmt.c b/rpmdb/hdrfmt.c
+index 2b20c9c..e5be69e 100644
+--- a/rpmdb/hdrfmt.c
++++ b/rpmdb/hdrfmt.c
+@@ -5929,6 +5929,7 @@ fprintf(stderr, "\tnext *%p = NUL\n", next);
+ 		    if (t != NULL) {
+ 			*t++ = '\0';
+ 			if (te <= t || te[-1] != ')') {
++			    *te = c;	/* coverity #1214085 */
+ 			    hsa->errmsg = _("malformed parameter list");
+ 			    format = freeFormat(format, numTokens);
+ 			    return 1;
+-- 
+2.0.1
+

@@ -1,0 +1,49 @@
+From dfb92ea3e0c12458cac2264621f11f1008ccef9b Mon Sep 17 00:00:00 2001
+From: jbj <jbj>
+Date: Mon, 5 May 2014 19:03:53 +0000
+Subject: [PATCH 26/46] - ecdsa: define disabler bits.
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+Signed-off-by: Randy MacLeod <Randy.MacLeod@windriver.com>
+---
+ CHANGES            | 1 +
+ rpmio/rpmiotypes.h | 8 +++++---
+ 2 files changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/CHANGES b/CHANGES
+index e5cd109..31c02c6 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -113,6 +113,7 @@
+     - mdawkins: start rpm-5.4.10 development.
+ 
+ Backports:
++    - jbj: ecdsa: define disabler bits.
+     - jbj: hkp: document more of the API.
+     - jbj: hkp: increase expected population of Bloom filters 10K -> 100K.
+     - jbj: bc: mpi names following BeeCrypt conventions, haul out some trash.
+diff --git a/rpmio/rpmiotypes.h b/rpmio/rpmiotypes.h
+index 89dbb4d..a6954ac 100644
+--- a/rpmio/rpmiotypes.h
++++ b/rpmio/rpmiotypes.h
+@@ -117,12 +117,14 @@ typedef enum pgpVSFlags_e {
+     RPMVSF_NOMD5HEADER	= (1 <<  9),	/* unimplemented */
+     RPMVSF_NODSAHEADER	= (1 << 10),
+     RPMVSF_NORSAHEADER	= (1 << 11),
+-    /* bit(s) 12-15 unused */
++    RPMVSF_NOECDSAHEADER= (1 << 12),
++    /* bit(s) 13-15 unused */
+     RPMVSF_NOSHA1	= (1 << 16),	/* unimplemented */
+     RPMVSF_NOMD5	= (1 << 17),
+     RPMVSF_NODSA	= (1 << 18),
+-    RPMVSF_NORSA	= (1 << 19)
+-    /* bit(s) 20-31 unused */
++    RPMVSF_NORSA	= (1 << 19),
++    RPMVSF_NOECDSA	= (1 << 20)
++    /* bit(s) 21-31 unused */
+ } pgpVSFlags;
+ 
+ /*@-redef@*/ /* LCL: ??? */
+-- 
+2.0.1
+

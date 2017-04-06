@@ -1,0 +1,65 @@
+From 6256f059a5a5e6747e1f7857997d63b1d819fef9 Mon Sep 17 00:00:00 2001
+From: jbj <jbj>
+Date: Sat, 3 May 2014 05:46:58 +0000
+Subject: [PATCH 16/46] - ssl: fix: follow openssl hash disabler conventions
+ (Mark Hatle).
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+Signed-off-by: Randy MacLeod <Randy.MacLeod@windriver.com>
+---
+ CHANGES        |  1 +
+ rpmio/rpmssl.c | 18 ++++++++++++++++--
+ 2 files changed, 17 insertions(+), 2 deletions(-)
+
+diff --git a/CHANGES b/CHANGES
+index e7416f2..9a5ce26 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -113,6 +113,7 @@
+     - mdawkins: start rpm-5.4.10 development.
+ 
+ Backports:
++    - jbj: ssl: fix: follow openssl hash disabler conventions (Mark Hatle).
+     - jbj: autoFu: fix: chk libcrypto, not libopenssl, for symbol (Mark Hatle).
+     - jbj: pgp: rework DSA/SHA1 in order to support DSA2 signatures.
+     - jbj: bc: add non-repudiable RSA signatures.
+diff --git a/rpmio/rpmssl.c b/rpmio/rpmssl.c
+index 21b9975..e18934f 100644
+--- a/rpmio/rpmssl.c
++++ b/rpmio/rpmssl.c
+@@ -80,16 +80,30 @@ static const EVP_MD * mapHash(unsigned hash_algo)
+     const EVP_MD * md = NULL;
+ 
+     switch (hash_algo) {
++#ifndef OPENSSL_NO_MD2
+     case PGPHASHALGO_MD2:	md = EVP_md2();		break;
++#endif
++#ifndef OPENSSL_NO_MD4
++    case PGPHASHALGO_MD4:	md = EVP_md4();		break;
++#endif
++#ifndef OPENSSL_NO_MD5
+     case PGPHASHALGO_MD5:	md = EVP_md5();		break;
++#endif
++#ifndef OPENSSL_NO_RIPEMD
+     case PGPHASHALGO_RIPEMD160:	md = EVP_ripemd160();	break;
++#endif
++#ifndef OPENSSL_NO_SHA
+     case PGPHASHALGO_SHA1:	md = EVP_sha1();	break;
++#endif
++#ifndef OPENSSL_NO_SHA256
+     case PGPHASHALGO_SHA224:	md = EVP_sha224();	break;
+     case PGPHASHALGO_SHA256:	md = EVP_sha256();	break;
++#endif
++#ifndef OPENSSL_NO_SHA512
+     case PGPHASHALGO_SHA384:	md = EVP_sha384();	break;
+     case PGPHASHALGO_SHA512:	md = EVP_sha512();	break;
+-
+-    case PGPHASHALGO_MD4:	/*@fallthrough@*/
++#endif
++    /* Anything not enabled above will just fall through... */
+     case PGPHASHALGO_TIGER192:	/*@fallthrough@*/
+     case PGPHASHALGO_HAVAL_5_160:	/*@fallthrough@*/
+     default:
+-- 
+2.0.1
+

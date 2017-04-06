@@ -1,0 +1,33 @@
+From 6f345a1cad74ef0a22ce47cb723285a6c9611133 Mon Sep 17 00:00:00 2001
+From: jbj <jbj>
+Date: Fri, 25 Apr 2014 20:03:16 +0000
+Subject: [PATCH 11/46] - macros: add additional tested signature/digest algos.
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+Signed-off-by: Randy MacLeod <Randy.MacLeod@windriver.com>
+---
+ macros/macros.rpmbuild.in | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/macros/macros.rpmbuild.in b/macros/macros.rpmbuild.in
+index 1830d91..49dae5d 100644
+--- a/macros/macros.rpmbuild.in
++++ b/macros/macros.rpmbuild.in
+@@ -265,9 +265,14 @@ echo "Patch #%{__patch_number} (%{basename:%{__patch_file}}):" && ( %{uncompress
+ #
+ # Choose the non-repudiable signature algorithm:
+ # 	DSA		(default)
++# 	DSA/SHA224
++# 	DSA/SHA256
++# 	RSA		(implies SHA1)
+ # 	RSA/SHA1
++# 	RSA/SHA224
+ # 	RSA/SHA256
+ # 	RSA/SHA384
++# 	RSA/SHA512
+ #
+ %_build_sign	DSA
+ 
+-- 
+2.0.1
+

@@ -1,0 +1,27 @@
+From 36e6e5b31091b693108b97fe2a975f627736c644 Mon Sep 17 00:00:00 2001
+From: jbj <jbj>
+Date: Wed, 14 May 2014 23:12:29 +0000
+Subject: [PATCH 42/46] - coverity #1214083
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+Signed-off-by: Randy MacLeod <Randy.MacLeod@windriver.com>
+---
+ rpmio/rpmssl.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/rpmio/rpmssl.c b/rpmio/rpmssl.c
+index 00f6673..b03d021 100644
+--- a/rpmio/rpmssl.c
++++ b/rpmio/rpmssl.c
+@@ -739,6 +739,8 @@ assert(mbits == ssl->qbits);
+ 	    ssl->curveN = _free(ssl->curveN);
+ 	    ssl->curveN = xstrdup("nistp256");
+ 	    ssl->nid = NID_X9_62_prime256v1;
++	    ssl->nbits = 256;	/* coverity #1214083 */
++	    break;
+ 	case NID_X9_62_prime256v1:
+ 	    ssl->nbits = 256;
+ 	    break;
+-- 
+2.0.1
+

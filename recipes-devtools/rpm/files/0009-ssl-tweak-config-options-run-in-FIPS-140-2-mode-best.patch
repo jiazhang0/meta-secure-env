@@ -1,0 +1,175 @@
+From e02c587675b63e978d8bf708e20ce4bbe9fe6f59 Mon Sep 17 00:00:00 2001
+From: jbj <jbj>
+Date: Thu, 17 Apr 2014 23:19:28 +0000
+Subject: [PATCH 03/46] - ssl: tweak config options, run in FIPS-140-2 mode
+ "best effort".
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+Signed-off-by: Randy MacLeod <Randy.MacLeod@windriver.com>
+---
+ CHANGES        |  1 +
+ rpmio/rpmssl.c | 98 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++--
+ rpmio/rpmssl.h |  3 ++
+ 3 files changed, 100 insertions(+), 2 deletions(-)
+
+diff --git a/CHANGES b/CHANGES
+index 18e1ac5..ae0491d 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -113,6 +113,7 @@
+     - mdawkins: start rpm-5.4.10 development.
+ 
+ Backports:
++    - jbj: ssl: tweak config options, run in FIPS-140-2 mode "best effort".
+     - jbj: pgp: permit non-repudiable signature on all crypto stacks.
+     - jbj: cipher: stub-in cipher methods and object.
+ 5.4.8 -> 5.4.9: 
+diff --git a/rpmio/rpmssl.c b/rpmio/rpmssl.c
+index 13bdb35..1e56d86 100644
+--- a/rpmio/rpmssl.c
++++ b/rpmio/rpmssl.c
+@@ -33,7 +33,7 @@ extern int _pgp_print;
+ /*@=redecl@*/
+ 
+ /*@unchecked@*/
+-static int _rpmssl_debug = -1;
++static int _rpmssl_debug;
+ 
+ #define	SPEW(_t, _rc, _dig)	\
+   { if ((_t) || _rpmssl_debug || _pgp_debug < 0) \
+@@ -701,23 +701,117 @@ void rpmsslClean(void * impl)
+ }
+ /*@=mustmod@*/
+ 
++/*@unchecked@*/
++static int rpmssl_initialized;
++
+ static /*@null@*/
+ void * rpmsslFree(/*@only@*/ void * impl)
+ 	/*@modifies impl @*/
+ {
+     rpmsslClean(impl);
++
++    if (--rpmssl_initialized == 0) {
++
++	CONF_modules_unload(1);
++	OBJ_cleanup();
++	EVP_cleanup();
++	ENGINE_cleanup();
++	CRYPTO_cleanup_all_ex_data();
++	ERR_remove_thread_state(NULL);
++	ERR_free_strings();
++	COMP_zlib_cleanup();
++
++    }
++
+     impl = _free(impl);
++
+     return NULL;
+ }
+ 
++
++#ifdef	REFERENCE
++#include <openssl/evp.h>
++#include <openssl/crypto.h>
++#include <openssl/bn.h>
++# include <openssl/md2.h>
++# include <openssl/rc4.h>
++# include <openssl/des.h>
++# include <openssl/idea.h>
++# include <openssl/blowfish.h>
++#include <openssl/engine.h>
++#endif
++
++static const char *rpmsslEngines(char *te)
++{
++    char *t = te;
++    ENGINE *e;
++
++    for (e = ENGINE_get_first(); e != NULL; e = ENGINE_get_next(e))
++	te = stpcpy(stpcpy(te, " "), ENGINE_get_id(e));
++    *te = '\0';
++
++    return t;
++}
++
++static void rpmsslVersionLog(void)
++{
++    int msglvl = RPMLOG_DEBUG;
++    char b[8192];
++
++    rpmlog(msglvl, "---------- openssl %s configuration:\n",
++	   SSLeay_version(SSLEAY_VERSION));
++
++#ifdef	DYING
++    if (SSLeay() == SSLEAY_VERSION_NUMBER)
++	rpmlog(msglvl, "%s\n", SSLeay_version(SSLEAY_VERSION));
++    else
++	rpmlog(msglvl, "%s (Library: %s)\n",
++	       OPENSSL_VERSION_TEXT, SSLeay_version(SSLEAY_VERSION));
++#endif
++
++    rpmlog(msglvl, "  %s\n", SSLeay_version(SSLEAY_BUILT_ON));
++
++    rpmlog(msglvl, "  %s\n", SSLeay_version(SSLEAY_PLATFORM));
++
++    rpmlog(msglvl, "   options: %s\n", BN_options());
++
++    rpmlog(msglvl, "  %s\n", SSLeay_version(SSLEAY_CFLAGS));
++
++    rpmlog(msglvl, "%s\n", SSLeay_version(SSLEAY_DIR));
++
++    rpmlog(msglvl, "   engines:%s\n", rpmsslEngines(b));
++
++    rpmlog(msglvl, "      FIPS: %s\n",
++	(FIPS_mode() ? "enabled" : "disabled"));
++
++    rpmlog(msglvl, "----------\n");
++}
++
+ static
+ void * rpmsslInit(void)
+ 	/*@*/
+ {
+     rpmssl ssl = (rpmssl) xcalloc(1, sizeof(*ssl));
++
++    if (rpmssl_initialized++ == 0) {
++	int xx;
++
+ /*@-moduncon@*/
+-    ERR_load_crypto_strings();
++#ifdef	NOTYET
++	CRYPTO_malloc_init();
++#endif
++	ERR_load_crypto_strings();
++	OpenSSL_add_all_algorithms();
++	ENGINE_load_builtin_engines();
++
++	xx = FIPS_mode_set(1);
++
+ /*@=moduncon@*/
++
++	rpmsslVersionLog();
++
++    }
++
+     return (void *) ssl;
+ }
+ 
+diff --git a/rpmio/rpmssl.h b/rpmio/rpmssl.h
+index 41509cb..ddb1ca9 100644
+--- a/rpmio/rpmssl.h
++++ b/rpmio/rpmssl.h
+@@ -21,6 +21,9 @@
+ #include <openssl/dsa.h>
+ #include <openssl/rsa.h>
+ #include <openssl/engine.h>
++
++#include <openssl/conf.h>
++#include <openssl/comp.h>
+ #endif
+ 
+ /**
+-- 
+2.0.1
+

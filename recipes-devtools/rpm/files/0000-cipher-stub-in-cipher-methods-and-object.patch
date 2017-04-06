@@ -1,0 +1,417 @@
+From 6887c4c58149e00e0c10f22b5c4ff404fe96e1cd Mon Sep 17 00:00:00 2001
+From: jbj <jbj>
+Date: Sat, 16 Nov 2013 18:45:54 +0000
+Subject: [PATCH 01/46] - cipher: stub-in cipher methods and object.
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+Signed-off-by: Randy MacLeod <Randy.MacLeod@windriver.com>
+---
+ CHANGES             |   2 +
+ rpmio/Makefile.am   |   1 +
+ rpmio/cipher.c      | 123 ++++++++++++++++++++++++++++++++++++++++++++++++
+ rpmio/librpmio.vers |   5 ++
+ rpmio/rpmiotypes.h  | 131 ++++++++++++++++++++++++++++++++++++++++++++--------
+ rpmio/rpmpgp.h      |  45 ------------------
+ 6 files changed, 244 insertions(+), 63 deletions(-)
+ create mode 100644 rpmio/cipher.c
+
+diff --git a/CHANGES b/CHANGES
+index 070ae8b..e3176e1 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -112,6 +112,8 @@
+       no-owner-group-on-srpm-install feature 
+     - mdawkins: start rpm-5.4.10 development.
+ 
++Backports:
++    - jbj: cipher: stub-in cipher methods and object.
+ 5.4.8 -> 5.4.9: 
+     - mdawkins:	applied mdv patch rpm-5.4.4-find-debuginfo-add-missing-partial-strip.patch
+     - mdawkins: applied mdv patch rpm-5.4.4-compress-debug-sections.patch
+diff --git a/rpmio/Makefile.am b/rpmio/Makefile.am
+index 5b254db..bd5501c 100644
+--- a/rpmio/Makefile.am
++++ b/rpmio/Makefile.am
+@@ -135,6 +135,7 @@ librpmio_la_SOURCES = \
+ 	argv.c \
+ 	bson.c \
+ 	bzdio.c \
++	cipher.c \
+ 	cpio.c \
+ 	crc.c \
+ 	digest.c \
+diff --git a/rpmio/cipher.c b/rpmio/cipher.c
+new file mode 100644
+index 0000000..f39888f
+--- /dev/null
++++ b/rpmio/cipher.c
+@@ -0,0 +1,123 @@
++/** \ingroup rpmio
++ * \file rpmio/cphpt.c
++ */
++
++#include "system.h"
++
++#include "rpmio_internal.h"
++
++#include <rpmbc.h>
++
++#include "debug.h"
++
++#define	_CIPHER_DEBUG	-1
++/*@unchecked@*/
++int _cph_debug = _CIPHER_DEBUG;
++
++#ifdef  _CIPHER_DEBUG
++#define DPRINTF(_a)     if (_cph_debug < 0) fprintf _a
++#else
++#define DPRINTF(_a)
++#endif
++
++/*@access CIPHER_CTX@*/
++
++/**
++ * Cipher private data.
++ */
++struct CIPHER_CTX_s {
++    struct rpmioItem_s _item;	/*!< usage mutex and pool identifier. */
++/*@observer@*/
++    const char * name;		/*!< Cipher name. */
++    size_t paramsize;		/*!< No. bytes of digest parameters. */
++    size_t blocksize;		/*!< No. bytes in block of plaintext data. */
++    size_t keybitsmin;		/*!< Minimum no. of key bits. */
++    size_t keybitsmax;		/*!< Maximum no. of key bits. */
++    size_t keybitsinc;		/*!< Allowed increment in key bits. */
++    int (*Setup) (void *, const byte *, size_t, int);
++    int (*SetIV) (void *, const byte *);
++    int (*SetCTR) (void *, const byte *, size_t);
++    uint32_t * (*Feedback) (void *);
++    int (*RAW) (void *, uint32_t *, const uint32_t *);
++    int (*ECB) (void *, uint32_t *, const uint32_t *, unsigned int);
++    int (*CBC) (void *, uint32_t *, const uint32_t *, unsigned int);
++    int (*CTR) (void *, uint32_t *, const uint32_t *, unsigned int);
++
++    pgpSymkeyAlgo symkeyalgo;	/*!< RFC 2440/4880 symkey algorithm id. */
++    rpmCipherFlags flags;	/*!< Bit(s) to control cipher operation. */
++    void * param;               /*!< Cipher parameters. */
++};
++
++static void cphFini(void * _cph)
++	/*@modifies _cph @*/
++{
++    CIPHER_CTX cph = (CIPHER_CTX) _cph;
++    if (cph->param != NULL && cph->paramsize > 0)
++	memset(cph->param, 0, cph->paramsize);	/* In case it's sensitive */
++    cph->param = _free(cph->param);
++    cph->name = NULL;
++    cph->paramsize = 0;
++    cph->blocksize = 0;
++    cph->keybitsmin = 0;
++    cph->keybitsmax = 0;
++    cph->keybitsinc = 0;
++    cph->Setup = NULL;
++    cph->SetIV = NULL;
++    cph->SetCTR = NULL;
++    cph->Feedback = NULL;
++    cph->RAW = NULL;
++    cph->ECB = NULL;
++    cph->CBC = NULL;
++    cph->CTR = NULL;
++
++    cph->symkeyalgo = (pgpSymkeyAlgo)0;
++    cph->flags = (rpmCipherFlags)0;
++}
++
++/*@unchecked@*/ /*@only@*/ /*@null@*/
++rpmioPool _cphPool;
++
++static CIPHER_CTX cphGetPool(rpmioPool pool)
++{
++    CIPHER_CTX cph;
++
++    if (_cphPool == NULL) {
++ANNOTATE_BENIGN_RACE(&_cphPool, "");
++	_cphPool = rpmioNewPool("cph", sizeof(*cph), -1, _cph_debug,
++			NULL, NULL, cphFini);
++	pool = _cphPool;
++    }
++    cph = (CIPHER_CTX) rpmioGetPool(pool, sizeof(*cph));
++    memset(((char *)cph)+sizeof(cph->_item), 0, sizeof(*cph)-sizeof(cph->_item));
++    return cph;
++}
++
++CIPHER_CTX
++rpmCipherInit(pgpSymkeyAlgo symkeyalgo, rpmCipherFlags flags)
++{
++    CIPHER_CTX cph = cphGetPool(_cphPool);
++
++    cph->symkeyalgo = symkeyalgo;
++    cph->flags = flags;
++
++DPRINTF((stderr, "==> cph %p ==== Init(%s, %x) param %p\n", cph, cph->name, flags, cph->param));
++
++    return (CIPHER_CTX)rpmioLinkPoolItem((rpmioItem)cph, __FUNCTION__, __FILE__, __LINE__);
++}
++
++int rpmCipherNext(/*@null@*/ CIPHER_CTX cph, void * data, size_t len)
++{
++    if (cph == NULL)
++        return -1;
++
++DPRINTF((stderr, "==> cph %p ==== Next(%s,%p[%u]) param %p\n", cph, cph->name, data, (unsigned)len, cph->param));
++
++    return 0;
++}
++
++int rpmCipherFinal(/*@only@*/ /*@null@*/ CIPHER_CTX cph)
++{
++DPRINTF((stderr, "==> cph %p ==== Final(%s) param %p\n", cph, cph->name, cph->param));
++    (void)rpmioFreePoolItem((rpmioItem)cph, __FUNCTION__, __FILE__, __LINE__);
++    return 0;
++}
+diff --git a/rpmio/librpmio.vers b/rpmio/librpmio.vers
+index c880725..6ef5768 100644
+--- a/rpmio/librpmio.vers
++++ b/rpmio/librpmio.vers
+@@ -356,6 +356,10 @@ LIBRPMIO_0
+     rpmbfParams;
+     rpmbfUnion;
+     rpmcdsaImplVecs;
++    _cph_debug;
++    rpmCipherInit;
++    rpmCipherNext;
++    rpmCipherFinal;
+     _rpmcudf_debug;
+     rpmcudfFree;
+     rpmcudfHasPreamble;
+@@ -373,6 +377,7 @@ LIBRPMIO_0
+     _rpmcvs_debug;
+     rpmcvsNew;
+     rpmDefineMacro;
++    _ctx_debug;
+     rpmDigestAlgo;
+     rpmDigestASN1;
+     rpmDigestDup;
+diff --git a/rpmio/rpmiotypes.h b/rpmio/rpmiotypes.h
+index d47bd23..89dbb4d 100644
+--- a/rpmio/rpmiotypes.h
++++ b/rpmio/rpmiotypes.h
+@@ -70,9 +70,20 @@ typedef struct rpmioP_s {
+     int ac;
+ } * rpmioP;
+ 
+-/** \ingroup rpmpgp
++#if defined(_RPMIOB_INTERNAL)
++/** \ingroup rpmio
+  */
+-typedef /*@abstract@*/ struct DIGEST_CTX_s * DIGEST_CTX;
++struct rpmiob_s {
++    struct rpmioItem_s _item;	/*!< usage mutex and pool identifier. */
++    rpmuint8_t * b;		/*!< data octects. */
++    size_t blen;		/*!< no. of octets used. */
++    size_t allocated;		/*!< no. of octets allocated. */
++#if defined(__LCLINT__)
++/*@refs@*/
++    int nrefs;				/*!< (unused) keep splint happy */
++#endif
++};
++#endif
+ 
+ /** \ingroup rpmpgp
+  */
+@@ -146,6 +157,105 @@ typedef enum rpmCallbackType_e {
+ typedef void * rpmCallbackData;
+ 
+ /** \ingroup rpmpgp
++ */
++typedef /*@abstract@*/ struct CIPHER_CTX_s * CIPHER_CTX;
++
++/** \ingroup rpmpgp
++ * 9.2. Symmetric Key Algorithms
++ *
++\verbatim
++       ID           Algorithm
++       --           ---------
++       0          - Plaintext or unencrypted data
++       1          - IDEA [IDEA]
++       2          - Triple-DES (DES-EDE, as per spec -
++                    168 bit key derived from 192)
++       3          - CAST5 (128 bit key, as per RFC 2144)
++       4          - Blowfish (128 bit key, 16 rounds) [BLOWFISH]
++       5          - SAFER-SK128 (13 rounds) [SAFER]
++       6          - Reserved for DES/SK
++       7          - AES with 128-bit key
++       8          - AES with 192-bit key
++       9          - AES with 256-bit key
++       10         - Twofish with 256-bit key
++       100 to 110 - Private/Experimental algorithm.
++\endverbatim
++ *
++ * Implementations MUST implement Triple-DES. Implementations SHOULD
++ * implement IDEA and CAST5. Implementations MAY implement any other
++ * algorithm.
++ */
++/*@-typeuse@*/
++typedef enum pgpSymkeyAlgo_e {
++    PGPSYMKEYALGO_PLAINTEXT	=  0,	/*!< Plaintext */
++    PGPSYMKEYALGO_IDEA		=  1,	/*!< IDEA */
++    PGPSYMKEYALGO_TRIPLE_DES	=  2,	/*!< 3DES */
++    PGPSYMKEYALGO_CAST5		=  3,	/*!< CAST5 */
++    PGPSYMKEYALGO_BLOWFISH	=  4,	/*!< BLOWFISH */
++    PGPSYMKEYALGO_SAFER		=  5,	/*!< SAFER */
++    PGPSYMKEYALGO_DES_SK	=  6,	/*!< DES/SK */
++    PGPSYMKEYALGO_AES_128	=  7,	/*!< AES(128-bit key) */
++    PGPSYMKEYALGO_AES_192	=  8,	/*!< AES(192-bit key) */
++    PGPSYMKEYALGO_AES_256	=  9,	/*!< AES(256-bit key) */
++    PGPSYMKEYALGO_TWOFISH	= 10,	/*!< TWOFISH(256-bit key) */
++    PGPSYMKEYALGO_CAMELLIA_128	= 11,	/*!< CAMELLIA(128-bit key) */
++    PGPSYMKEYALGO_CAMELLIA_192	= 12,	/*!< CAMELLIA(192-bit key) */
++    PGPSYMKEYALGO_CAMELLIA_256	= 13,	/*!< CAMELLIA(256-bit key) */
++    PGPSYMKEYALGO_NOENCRYPT	= 110	/*!< no encryption */
++} pgpSymkeyAlgo;
++/*@=typeuse@*/
++
++/** \ingroup rpmpgp
++ * Bit(s) to control cipher operation.
++ */
++typedef enum rpmCryptFlags_e {
++    RPMCIPHER_NONE	=	0,
++    RPMCIPHER_ENCRYPT	=	1,
++    RPMCIPHER_DECRYPT	=	2
++} rpmCipherFlags;
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++/** \ingroup rpmpgp
++ * Initialize cipher context.
++ * Set bit count to 0 and buffer to mysterious initialization constants.
++ * @param symkeyalgo	type of cipher
++ * @param flags		bit(s) to control cipher operation
++ * @return		cipher context
++ */
++/*@only@*/ /*@null@*/
++CIPHER_CTX rpmCipherInit(pgpSymkeyAlgo symkeyalgo, rpmCipherFlags flags)
++	/*@*/;
++
++/** \ingroup rpmpgp
++ * Encrypt/Decrypt a block of data.
++ * @param cph		cipher context
++ * @param data		next data buffer
++ * @param len		no. bytes of data
++ * @return		0 on success
++ */
++int rpmCipherNext(/*@null@*/ CIPHER_CTX cph, void * data, size_t len)
++	/*@modifies ctx @*/;
++
++/** \ingroup rpmpgp
++ * Destroy cipher context.
++ * @param cph		cipher context
++ * @return		0 on success
++ */
++int rpmCipherFinal(/*@only@*/ /*@null@*/ CIPHER_CTX cph)
++		/*@*/;
++
++#ifdef __cplusplus
++}
++#endif
++
++/** \ingroup rpmpgp
++ */
++typedef /*@abstract@*/ struct DIGEST_CTX_s * DIGEST_CTX;
++
++/** \ingroup rpmpgp
+  * 9.4. Hash Algorithms
+  *
+ \verbatim
+@@ -301,21 +411,6 @@ typedef enum rpmDigestFlags_e {
+     RPMDIGEST_NONE	=	0
+ } rpmDigestFlags;
+ 
+-#if defined(_RPMIOB_INTERNAL)
+-/** \ingroup rpmio
+- */
+-struct rpmiob_s {
+-    struct rpmioItem_s _item;	/*!< usage mutex and pool identifier. */
+-    rpmuint8_t * b;		/*!< data octects. */
+-    size_t blen;		/*!< no. of octets used. */
+-    size_t allocated;		/*!< no. of octets allocated. */
+-#if defined(__LCLINT__)
+-/*@refs@*/
+-    int nrefs;				/*!< (unused) keep splint happy */
+-#endif
+-};
+-#endif
+-
+ #ifdef __cplusplus
+ extern "C" {
+ #endif
+@@ -365,7 +460,7 @@ DIGEST_CTX rpmDigestDup(DIGEST_CTX octx)
+ 	/*@*/;
+ 
+ /** \ingroup rpmpgp
+- * Initialize digest.
++ * Initialize digest context.
+  * Set bit count to 0 and buffer to mysterious initialization constants.
+  * @param hashalgo	type of digest
+  * @param flags		bit(s) to control digest operation
+diff --git a/rpmio/rpmpgp.h b/rpmio/rpmpgp.h
+index f36d203..a908cc3 100644
+--- a/rpmio/rpmpgp.h
++++ b/rpmio/rpmpgp.h
+@@ -274,51 +274,6 @@ typedef enum pgpPubkeyAlgo_e {
+ extern struct pgpValTbl_s pgpPubkeyTbl[];
+ 
+ /** \ingroup rpmpgp
+- * 9.2. Symmetric Key Algorithms
+- *
+-\verbatim
+-       ID           Algorithm
+-       --           ---------
+-       0          - Plaintext or unencrypted data
+-       1          - IDEA [IDEA]
+-       2          - Triple-DES (DES-EDE, as per spec -
+-                    168 bit key derived from 192)
+-       3          - CAST5 (128 bit key, as per RFC 2144)
+-       4          - Blowfish (128 bit key, 16 rounds) [BLOWFISH]
+-       5          - SAFER-SK128 (13 rounds) [SAFER]
+-       6          - Reserved for DES/SK
+-       7          - AES with 128-bit key
+-       8          - AES with 192-bit key
+-       9          - AES with 256-bit key
+-       10         - Twofish with 256-bit key
+-       100 to 110 - Private/Experimental algorithm.
+-\endverbatim
+- *
+- * Implementations MUST implement Triple-DES. Implementations SHOULD
+- * implement IDEA and CAST5. Implementations MAY implement any other
+- * algorithm.
+- */
+-/*@-typeuse@*/
+-typedef enum pgpSymkeyAlgo_e {
+-    PGPSYMKEYALGO_PLAINTEXT	=  0,	/*!< Plaintext */
+-    PGPSYMKEYALGO_IDEA		=  1,	/*!< IDEA */
+-    PGPSYMKEYALGO_TRIPLE_DES	=  2,	/*!< 3DES */
+-    PGPSYMKEYALGO_CAST5		=  3,	/*!< CAST5 */
+-    PGPSYMKEYALGO_BLOWFISH	=  4,	/*!< BLOWFISH */
+-    PGPSYMKEYALGO_SAFER		=  5,	/*!< SAFER */
+-    PGPSYMKEYALGO_DES_SK	=  6,	/*!< DES/SK */
+-    PGPSYMKEYALGO_AES_128	=  7,	/*!< AES(128-bit key) */
+-    PGPSYMKEYALGO_AES_192	=  8,	/*!< AES(192-bit key) */
+-    PGPSYMKEYALGO_AES_256	=  9,	/*!< AES(256-bit key) */
+-    PGPSYMKEYALGO_TWOFISH	= 10,	/*!< TWOFISH(256-bit key) */
+-    PGPSYMKEYALGO_CAMELLIA_128	= 11,	/*!< CAMELLIA(128-bit key) */
+-    PGPSYMKEYALGO_CAMELLIA_192	= 12,	/*!< CAMELLIA(192-bit key) */
+-    PGPSYMKEYALGO_CAMELLIA_256	= 13,	/*!< CAMELLIA(256-bit key) */
+-    PGPSYMKEYALGO_NOENCRYPT	= 110	/*!< no encryption */
+-} pgpSymkeyAlgo;
+-/*@=typeuse@*/
+-
+-/** \ingroup rpmpgp
+  * Symmetric key (string, value) pairs.
+  */
+ /*@observer@*/ /*@unchecked@*/ /*@unused@*/
+-- 
+2.0.1
+

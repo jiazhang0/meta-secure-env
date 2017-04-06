@@ -1,0 +1,347 @@
+From 99c48573902e6acf8a04b4c99c1de8d8935f05c0 Mon Sep 17 00:00:00 2001
+From: jbj <jbj>
+Date: Wed, 23 Apr 2014 22:25:42 +0000
+Subject: [PATCH 06/46] - pgp: configurable non-repudiable signature
+ pubkey/hash algos. - pgp: set pubkey/hash algo's as early as possible.
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+Signed-off-by: Randy MacLeod <Randy.MacLeod@windriver.com>
+
+Regenerated patch without a non-functional hunk from macros/macros.rpmbuild.in
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+
+---
+ CHANGES                   |   2 +
+ build/pack.c              |  25 +++++++++---
+ macros/macros.rpmbuild.in |  10 ++++-
+ rpmio/rpmpgp.c            | 101 +++++++++++++++++++++++++++++++++++-----------
+ rpmio/rpmpgp.h            |  31 +++++++++++++-
+ 5 files changed, 138 insertions(+), 31 deletions(-)
+
+--- a/CHANGES
++++ b/CHANGES
+@@ -114,6 +114,8 @@
+     - mdawkins: start rpm-5.4.10 development.
+ 
+ Backports:
++    - jbj: pgp: configurable non-repudiable signature pubkey/hash algos.
++    - jbj: pgp: set pubkey/hash algo's as early as possible.
+     - jbj: rsa: fix: lookup pubkey before finalizing context (for PKCS1).
+     - jbj: ssl: rewrite to use the higher level EVP layer, haul the trash.
+     - jbj: ssl: tweak config options, run in FIPS-140-2 mode "best effort".
+--- a/build/pack.c
++++ b/build/pack.c
+@@ -806,9 +806,16 @@ assert(s);
+ 	goto exit;
+     }
+ 
++pgpDigParams sigp = pgpGetSignature(dig);
++pgpDigParams pubp = pgpGetPubkey(dig);
++
+     /* Write the header to a temp file, computing header SHA1 on the fly. */
+     fdInitDigest(fd, PGPHASHALGO_SHA1, 0);
+ assert(fd->ndigests == 1);
++    if (sigp->hash_algo != PGPHASHALGO_SHA1) {
++	fdInitDigest(fd, sigp->hash_algo, 0);
++assert(fd->ndigests == 2);
++    }
+     {	const char item[] = "Header";
+ 	msg = NULL;
+ 	rc = rpmpkgWrite(item, fd, h, &msg);
+@@ -823,15 +830,13 @@ assert(fd->ndigests == 1);
+ 	(void) Fflush(fd);
+     }
+ 
+-    {	/* XXX Dupe the header SHA1 for the RFC 2440/4880 signature. */
+-	DIGEST_CTX ctx = (dig ? rpmDigestDup(fd->digests[0]) : NULL);
+-pgpDigParams sigp = pgpGetSignature(dig);
++    {	/* XXX Dupe the header hash for the RFC 2440/4880 signature. */
++	DIGEST_CTX ctx = (dig ? rpmDigestDup(fd->digests[fd->ndigests-1]) : NULL);
+ 
+ 	/* Finalize the header SHA1. */
+ 	/* XXX FIXME: get binary octets, not ASCII. */
+ 	fdFiniDigest(fd, PGPHASHALGO_SHA1, &SHA1, NULL, 1);
+ 
+-sigp->hash_algo = PGPHASHALGO_SHA1;		/* XXX DSA assumed */
+ sigp->signhash16[0] = (rpmuint8_t) (nibble(SHA1[0]) << 4) | nibble(SHA1[1]);
+ sigp->signhash16[1] = (rpmuint8_t) (nibble(SHA1[2]) << 4) | nibble(SHA1[3]);
+ 
+@@ -870,7 +875,17 @@ assert(0);
+ 	(void) rpmAddSignature(sigh, sigtarget, sigtag, passPhrase);
+     }
+     else if (dig && dig->sig && dig->siglen > 0) {
+-	he->tag = (rpmTag) RPMSIGTAG_DSA;	/* XXX DSA assumed */
++	switch (pubp->pubkey_algo) {
++	default:
++assert(0);
++	    break;
++	case PGPPUBKEYALGO_RSA:
++	    he->tag = (rpmTag) RPMSIGTAG_RSA;
++	    break;
++	case PGPPUBKEYALGO_DSA:
++	    he->tag = (rpmTag) RPMSIGTAG_DSA;
++	    break;
++	}
+ 	he->t = RPM_BIN_TYPE;
+ 	he->p.ptr = (void *) dig->sig;
+ 	he->c = dig->siglen;
+--- a/macros/macros.rpmbuild.in
++++ b/macros/macros.rpmbuild.in
+@@ -263,6 +263,15 @@ echo "Patch #%{__patch_number} (%{basena
+ #
+ 
+ #
++# Choose the non-repudiable signature algorithm:
++# 	DSA		(default)
++# 	RSA/SHA1
++# 	RSA/SHA256
++# 	RSA/SHA384
++#
++%_build_sign	DSA
++
++#
+ # Choose metadata file digest algorithm:
+ #	1 	MD5
+ #	2	SHA1
+--- a/rpmio/rpmpgp.c
++++ b/rpmio/rpmpgp.c
+@@ -9,6 +9,7 @@
+ #include <rpmiotypes.h>
+ 
+ #include <rpmio.h>
++#include <rpmmacro.h>
+ 
+ #define	_RPMPGP_INTERNAL
+ #include <rpmbc.h>	/* XXX still needs base64 goop */
+@@ -57,23 +58,23 @@ pgpImplVecs_t * pgpImplVecs =
+ 	&rpmnssImplVecs;
+ #elif defined(USE_CRYPTO_OPENSSL) && defined(WITH_SSL)
+ 	&rpmsslImplVecs;
+-#elif defined(USE_CRYPTO_CDSA) && defined(WITH_CDSA)
+-	&rpmcdsaImplVecs;
+ #elif defined(USE_CRYPTO_TOMCRYPT) && defined(WITH_TOMCRYPT)
+ 	&rpmltcImplVecs;
++#elif defined(USE_CRYPTO_CDSA) && defined(WITH_CDSA)
++	&rpmcdsaImplVecs;
+     /* implict selection (order DOES matter) */
+ #elif defined(WITH_BEECRYPT)
+ 	&rpmbcImplVecs;
+ #elif defined(WITH_NSS)
+ 	&rpmnssImplVecs;
+-#elif defined(WITH_GCRYPT)
+-	&rpmgcImplVecs;
+ #elif defined(WITH_SSL)
+ 	&rpmsslImplVecs;
+-#elif defined(WITH_CDSA)
+-	&rpmcdsaImplVecs;
++#elif defined(WITH_GCRYPT)
++	&rpmgcImplVecs;
+ #elif defined(WITH_TOMCRYPT)
+ 	&rpmltcImplVecs;
++#elif defined(WITH_CDSA)
++	&rpmcdsaImplVecs;
+ #else
+ #error INTERNAL ERROR: no suitable Cryptography library available
+ #endif
+@@ -1120,6 +1121,7 @@ void pgpDigClean(pgpDig dig)
+     if (dig != NULL) {
+ 	dig->signature.userid = _free(dig->signature.userid);
+ 	dig->pubkey.userid = _free(dig->pubkey.userid);
++	dig->build_sign = _free(dig->build_sign);
+ 	dig->pubkey_algoN = NULL;
+ 	dig->hash_algoN = NULL;
+ 	memset(&dig->dops, 0, sizeof(dig->dops));
+@@ -1147,6 +1149,56 @@ void pgpDigClean(pgpDig dig)
+ /*@=nullstate@*/
+ }
+ 
++const char * pgpHashAlgo2Name(uint32_t algo)
++{
++    return pgpValStr(pgpHashTbl, (rpmuint8_t)algo);
++}
++
++const char * pgpPubkeyAlgo2Name(uint32_t algo)
++{
++    return pgpValStr(pgpPubkeyTbl, (rpmuint8_t)algo);
++}
++
++rpmuint8_t pgpHashName2Algo(const char * name)
++{
++    return pgpStrVal(pgpHashTbl, name);
++}
++
++rpmuint8_t pgpPubkeyName2Algo(const char * name)
++{
++    return pgpStrVal(pgpPubkeyTbl, name);
++}
++
++static int pgpDigSetAlgos(pgpDig dig)
++{
++pgpDigParams pubp = pgpGetPubkey(dig);
++pgpDigParams sigp = pgpGetSignature(dig);
++    char * t, * te;
++    int rc = 0;
++
++    t = rpmExpand("%{?_build_sign}", NULL);
++    if (!(t && *t))
++	t = xstrdup("DSA");
++    dig->build_sign = t;
++
++    if ((te = strrchr(t, '/')) != NULL)
++	*te++ = '\0';
++    else
++	te = "SHA1";
++
++    dig->pubkey_algoN = t;
++    dig->hash_algoN = te;
++
++    if ((pubp->pubkey_algo = pgpPubkeyName2Algo(dig->pubkey_algoN)) == 0) {
++	pubp->pubkey_algo = PGPPUBKEYALGO_DSA;
++	sigp->hash_algo = PGPHASHALGO_SHA1;
++    } else
++    if ((sigp->hash_algo = pgpHashName2Algo(dig->hash_algoN)) == 0)
++	sigp->hash_algo = PGPHASHALGO_SHA1;
++
++    return rc;
++}
++
+ static void pgpDigFini(void * __dig)
+ 	/*@globals fileSystem, internalState @*/
+ 	/*@modifies __dig, fileSystem, internalState @*/
+@@ -1218,15 +1270,18 @@ pgpDig pgpDigNew(pgpVSFlags vsflags, pgp
+ {
+     pgpDig dig = pgpDigLink( digGetPool(_digPool) );
+     pgpDigParams pubp = pgpGetPubkey(dig);
++    int xx;
+ 
+     /* XXX FIXME: always set default flags, ignore the arg. */
+     dig->vsflags = (vsflags != RPMVSF_DEFAULT ? vsflags : pgpDigVSFlags);
+     dig->impl = pgpImplInit();
++
+     /* XXX FIXME: always set default pubkey_algo, ignore the arg. */
+     pubp->pubkey_algo = pubkey_algo;
+ 
+     if (pubp->pubkey_algo) {
+-	int xx = pgpImplGenerate(dig);
++	xx = pgpDigSetAlgos(dig);
++	xx = pgpImplGenerate(dig);
+ assert(xx == 1);
+ 	xx = pgpExportPubkey(dig);
+     }
+@@ -1235,36 +1290,36 @@ assert(xx == 1);
+ 
+ int pgpExportPubkey(pgpDig dig)
+ {
+-    int xx = 0;	/* XXX FIXME */
+-    /* XXX FIXME: limited to DSA for now. */
++    int rc = 0;		/* assume failure */
++
+     if (pgpImplVecs == &rpmbcImplVecs)
+-	xx = rpmbcExportPubkey(dig);
++	rc = rpmbcExportPubkey(dig);
+     if (pgpImplVecs == &rpmsslImplVecs)
+-	xx = rpmsslExportPubkey(dig);
++	rc = rpmsslExportPubkey(dig);
+     if (pgpImplVecs == &rpmnssImplVecs)
+-	xx = rpmnssExportPubkey(dig);
++	rc = rpmnssExportPubkey(dig);
+     if (pgpImplVecs == &rpmgcImplVecs)
+-	xx = rpmgcExportPubkey(dig);
++	rc = rpmgcExportPubkey(dig);
+     if (pgpImplVecs == &rpmltcImplVecs)
+-	xx = rpmltcExportPubkey(dig);
+-    return xx;
++	rc = rpmltcExportPubkey(dig);
++    return rc;
+ }
+ 
+ int pgpExportSignature(pgpDig dig, DIGEST_CTX ctx)
+ {
+-    int xx = 0;	/* XXX FIXME */
+-    /* XXX FIXME: limited to DSA for now. */
++    int rc = 0;		/* assume failure */
++
+     if (pgpImplVecs == &rpmbcImplVecs)
+-	xx = rpmbcExportSignature(dig, ctx);
++	rc = rpmbcExportSignature(dig, ctx);
+     if (pgpImplVecs == &rpmsslImplVecs)
+-	xx = rpmsslExportSignature(dig, ctx);
++	rc = rpmsslExportSignature(dig, ctx);
+     if (pgpImplVecs == &rpmnssImplVecs)
+-	xx = rpmnssExportSignature(dig, ctx);
++	rc = rpmnssExportSignature(dig, ctx);
+     if (pgpImplVecs == &rpmgcImplVecs)
+-	xx = rpmgcExportSignature(dig, ctx);
++	rc = rpmgcExportSignature(dig, ctx);
+     if (pgpImplVecs == &rpmltcImplVecs)
+-	xx = rpmltcExportSignature(dig, ctx);
+-    return xx;
++	rc = rpmltcExportSignature(dig, ctx);
++    return rc;
+ }
+ 
+ pgpDigParams pgpGetSignature(pgpDig dig)
+--- a/rpmio/rpmpgp.h
++++ b/rpmio/rpmpgp.h
+@@ -58,6 +58,8 @@ struct pgpDig_s {
+     struct pgpDigParams_s pubkey;
+ 
+ /*@observer@*/ /*@null@*/
++    const char * build_sign;
++/*@observer@*/ /*@null@*/
+     const char * pubkey_algoN;
+ /*@observer@*/ /*@null@*/
+     const char * hash_algoN;
+@@ -1145,10 +1147,10 @@ const char * pgpMpiStr(const rpmuint8_t
+ }
+ 
+ /** \ingroup rpmpgp
+- * Return string representation of am OpenPGP value.
++ * Return string representation of an OpenPGP value.
+  * @param vs		table of (string,value) pairs
+  * @param val		byte value to lookup
+- * @return		string value of byte
++ * @return		string
+  */
+ /*@unused@*/ static inline /*@observer@*/
+ const char * pgpValStr(pgpValTbl vs, rpmuint8_t val)
+@@ -1162,6 +1164,23 @@ const char * pgpValStr(pgpValTbl vs, rpm
+ }
+ 
+ /** \ingroup rpmpgp
++ * Return byte value of an OpenPGP string.
++ * @param vs		table of (string,value) pairs
++ * @param str		string to lookup
++ * @return		byte (or 0 on failure)
++ */
++/*@unused@*/ static inline /*@observer@*/
++rpmuint8_t pgpStrVal(pgpValTbl vs, const char * str)
++	/*@*/
++{
++    do {
++	if (!strcasecmp(str, vs->str))
++	    break;
++    } while ((++vs)->val != -1);
++    return (vs->val != -1 ? vs->val : 0);
++}
++
++/** \ingroup rpmpgp
+  * Return value of an OpenPGP string.
+  * @param vs		table of (string,value) pairs
+  * @param s		string token to lookup
+@@ -1442,6 +1461,14 @@ pgpDig pgpDigNew(pgpVSFlags vsflags, pgp
+ void pgpDigClean(/*@null@*/ pgpDig dig)
+ 	/*@modifies dig @*/;
+ 
++const char * pgpHashAlgo2Name(uint32_t algo)
++	/*@*/;
++const char * pgpPubkeyAlgo2Name(uint32_t algo)
++	/*@*/;
++rpmuint8_t pgpHashName2Algo(const char * name)
++	/*@*/;
++rpmuint8_t pgpPubkeyName2Algo(const char * name)
++	/*@*/;
+ int pgpExportPubkey(pgpDig dig)
+ 	/*@*/;
+ int pgpExportSignature(pgpDig dig, /*@only@*/ DIGEST_CTX ctx)

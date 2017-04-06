@@ -1,0 +1,45 @@
+From 3e9b70024569220f752c46b7bdb4ce84c5c0a340 Mon Sep 17 00:00:00 2001
+From: jbj <jbj>
+Date: Sat, 3 May 2014 04:53:35 +0000
+Subject: [PATCH 15/46] - autoFu: fix: chk libcrypto, not libopenssl, for
+ symbol (Mark Hatle).
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+Signed-off-by: Randy MacLeod <Randy.MacLeod@windriver.com>
+---
+ CHANGES      | 1 +
+ configure.ac | 4 ++--
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/CHANGES b/CHANGES
+index b6c43e4..e7416f2 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -113,6 +113,7 @@
+     - mdawkins: start rpm-5.4.10 development.
+ 
+ Backports:
++    - jbj: autoFu: fix: chk libcrypto, not libopenssl, for symbol (Mark Hatle).
+     - jbj: pgp: rework DSA/SHA1 in order to support DSA2 signatures.
+     - jbj: bc: add non-repudiable RSA signatures.
+     - jbj: ssl: fix: use ssl->pkey->pkey.dsa, not ssl->dsa, for pubkey export.
+diff --git a/configure.ac b/configure.ac
+index 6746b4c..4b029b4 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -1393,10 +1393,10 @@ RPM_CHECK_LIB(
+     [crypto], [ERR_load_CRYPTO_strings], [openssl/crypto.h],
+     [no,external:none], [],
+     [ AC_DEFINE(WITH_SSL, 1, [Define if building with OpenSSL])
+-      AC_CHECK_LIB([openssl], [RSA_generate_key_ex], [
++      AC_CHECK_LIB([crypto], [RSA_generate_key_ex], [
+           AC_DEFINE(HAVE_RSA_GENERATE_KEY_EX, 1, [Define to 1 if you have the RSA_generate_key_ex() function.])
+       ])
+-      AC_CHECK_LIB([openssl], [DSA_generate_parameters_ex], [
++      AC_CHECK_LIB([crypto], [DSA_generate_parameters_ex], [
+           AC_DEFINE(HAVE_DSA_GENERATE_PARAMETERS_EX, 1, [Define to 1 if you have the DSA_generate_parameters_ex() function.])
+       ])
+     ], [])
+-- 
+2.0.1
+

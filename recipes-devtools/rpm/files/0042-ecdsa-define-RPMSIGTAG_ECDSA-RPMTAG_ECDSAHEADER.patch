@@ -1,0 +1,47 @@
+From 5936866c88c02c2e1225c7b402cc33c014492f70 Mon Sep 17 00:00:00 2001
+From: jbj <jbj>
+Date: Mon, 5 May 2014 19:20:39 +0000
+Subject: [PATCH 28/46] - ecdsa: define RPMSIGTAG_ECDSA/RPMTAG_ECDSAHEADER.
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+Signed-off-by: Randy MacLeod <Randy.MacLeod@windriver.com>
+---
+ CHANGES        | 1 +
+ rpmdb/rpmtag.h | 2 ++
+ 2 files changed, 3 insertions(+)
+
+diff --git a/CHANGES b/CHANGES
+index 002dd83..95a6d94 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -113,6 +113,7 @@
+     - mdawkins: start rpm-5.4.10 development.
+ 
+ Backports:
++    - jbj: ecdsa: define RPMSIGTAG_ECDSA/RPMTAG_ECDSAHEADER.
+     - jbj: pgp: refactor some table lookup helpers.
+     - jbj: pgp: default non-repudiable ecdsa to sha256, not sha1.
+     - jbj: pgp: fix: detached signing with binary needs userid binding.
+diff --git a/rpmdb/rpmtag.h b/rpmdb/rpmtag.h
+index b4ad445..30507a4 100644
+--- a/rpmdb/rpmtag.h
++++ b/rpmdb/rpmtag.h
+@@ -168,6 +168,7 @@ enum rpmTag_e {
+     RPMTAG_RSAHEADER		= RPMTAG_SIG_BASE+12,	/* x */
+     RPMTAG_SHA1HEADER		= RPMTAG_SIG_BASE+13,	/* s */
+ #define	RPMTAG_HDRID	RPMTAG_SHA1HEADER	/* s */
++    RPMTAG_ECDSAHEADER		= RPMTAG_SIG_BASE+14,	/* x */
+ 
+     RPMTAG_NAME  		= 1000,	/* s */
+ #define	RPMTAG_N	RPMTAG_NAME	/* s */
+@@ -460,6 +461,7 @@ enum rpmSigTag_e {
+     RPMSIGTAG_SHA1	= RPMTAG_SHA1HEADER,	/*!< internal sha1 header digest. */
+     RPMSIGTAG_DSA	= RPMTAG_DSAHEADER,	/*!< internal DSA header signature. */
+     RPMSIGTAG_RSA	= RPMTAG_RSAHEADER,	/*!< internal RSA header signature. */
++    RPMSIGTAG_ECDSA	= RPMTAG_ECDSAHEADER,	/*!< internal ECDSA header signature. */
+     RPMSIGTAG_PADDING	= 0x3fffffff		/*!< signature header padding */
+ };
+ 
+-- 
+2.0.1
+

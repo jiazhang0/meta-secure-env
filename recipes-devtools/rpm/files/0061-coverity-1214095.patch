@@ -1,0 +1,30 @@
+From 748ea65bd7a8ef0b12f86febf6b34803044e55b0 Mon Sep 17 00:00:00 2001
+From: jbj <jbj>
+Date: Wed, 14 May 2014 22:44:19 +0000
+Subject: [PATCH 38/46] - coverity #1214095.
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+Signed-off-by: Randy MacLeod <Randy.MacLeod@windriver.com>
+---
+ lib/rpmts.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/lib/rpmts.c b/lib/rpmts.c
+index 50534b8..382eb63 100644
+--- a/lib/rpmts.c
++++ b/lib/rpmts.c
+@@ -471,8 +471,10 @@ fprintf(stderr, "--> %s(%p,%p,%p)\n", __FUNCTION__, ts, ds, data);
+     } else {
+ 	/* Format the suggested resolution path. */
+ 	const char * qfmt = rpmExpand("%{?_solve_name_fmt}", NULL);
+-	if (qfmt == NULL || *qfmt == '\0')
++	if (qfmt == NULL || *qfmt == '\0') {
++	    qfmt = _free(qfmt);		/* coverity #1214095 */
+ 	    goto exit;
++	}
+ 	str = headerSprintf(bh, qfmt, NULL, rpmHeaderFormats, &errstr);
+ 	qfmt = _free(qfmt);
+     }
+-- 
+2.0.1
+

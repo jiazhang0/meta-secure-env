@@ -1,0 +1,41 @@
+From 238f483b2d422d7c08dcdb1290be00aca096a4a0 Mon Sep 17 00:00:00 2001
+From: devzero2000 <devzero2000>
+Date: Thu, 15 May 2014 08:50:10 +0000
+Subject: [PATCH 45/46] rpmdb/pkgio.c: typofix
+
+Fix the typos introduced in the patches for
+
+- coverity #1214082 (rev. 1.121.2.9)
+- coverity #124081  (rev. 1.121.2.8)
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+Signed-off-by: Randy MacLeod <Randy.MacLeod@windriver.com>
+---
+ rpmdb/pkgio.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/rpmdb/pkgio.c b/rpmdb/pkgio.c
+index 7e287f3..435bd6b 100644
+--- a/rpmdb/pkgio.c
++++ b/rpmdb/pkgio.c
+@@ -837,7 +837,7 @@ fprintf(stderr, "--> rdSignature(%p, %p, %p)\n", fd, ptr, msg);
+         static const off_t off = 0;
+ 
+ 	ei = (rpmuint32_t *) mmap(NULL, pvlen, prot, flags, fdno, off);
+-assert(ei != NULL 77 ei != (void *)-1);		/* coverity #1214082 */
++assert(ei != NULL && ei != (void *)-1);		/* coverity #1214082 */
+ 	if (ei == NULL || ei == (void *)-1)
+             fprintf(stderr,
+                 "==> mmap(%p[%u], 0x%x, 0x%x, %d, 0x%x) error(%d): %s\n",
+@@ -1513,7 +1513,7 @@ fprintf(stderr, "--> rpmReadHeader(%p, %p, %p)\n", fd, hdrp, msg);
+         static const off_t off = 0;
+ 
+ 	ei = (rpmuint32_t *) mmap(NULL, uc, prot, flags, fdno, off);
+-assert(ei != NULL 77 ei != (void *)-1);		/* coverity #124081 */
++assert(ei != NULL && ei != (void *)-1);		/* coverity #124081 */
+ 	if (ei == NULL || ei == (void *)-1)
+             fprintf(stderr,
+                 "==> mmap(%p[%u], 0x%x, 0x%x, %d, 0x%x) error(%d): %s\n",
+-- 
+2.0.1
+

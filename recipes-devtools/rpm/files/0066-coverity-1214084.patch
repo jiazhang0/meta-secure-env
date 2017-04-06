@@ -1,0 +1,26 @@
+From cc2bd87c515e1eca995aa019c9e03f776e783c7e Mon Sep 17 00:00:00 2001
+From: jbj <jbj>
+Date: Wed, 14 May 2014 23:13:51 +0000
+Subject: [PATCH 43/46] - coverity #1214084.
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+Signed-off-by: Randy MacLeod <Randy.MacLeod@windriver.com>
+---
+ lib/rpmchecksig.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/lib/rpmchecksig.c b/lib/rpmchecksig.c
+index e55915a..c25869c 100644
+--- a/lib/rpmchecksig.c
++++ b/lib/rpmchecksig.c
+@@ -1237,6 +1237,7 @@ assert(she->p.ptr != NULL);
+ 		    /*@switchbreak@*/ break;
+ 		case RPMSIGTAG_ECDSA:
+ 		    b = stpcpy(b, "ECDSA ");
++		    /*@switchbreak@*/ break;	/* coverity #1214084 */
+ 		default:
+ 		    b = stpcpy(b, "?UnknownSignatureType? ");
+ 		    /*@switchbreak@*/ break;
+-- 
+2.0.1
+

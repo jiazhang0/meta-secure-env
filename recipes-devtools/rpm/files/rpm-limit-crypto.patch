@@ -1,0 +1,164 @@
+Limit the encryption options to beecrypt and openssl.
+
+Upstream-Status: Not Appropriate -- local configuration
+
+We limit the options, as we've only backported the fixes to allow
+beecrypt and openssl to work as the primary encryption engines.
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+Signed-off-by: Randy MacLeod <Randy.MacLeod@windriver.com>
+
+Index: rpm-5.4.9/rpmio/poptIO.c
+===================================================================
+--- rpm-5.4.9.orig/rpmio/poptIO.c
++++ rpm-5.4.9/rpmio/poptIO.c
+@@ -10,21 +10,9 @@
+ #if defined(WITH_BEECRYPT)
+ #include <rpmbc.h>
+ #endif
+-#if defined(WITH_CDSA)
+-#include <rpmcdsa.h>
+-#endif
+-#if defined(WITH_GCRYPT)
+-#include <rpmgc.h>
+-#endif
+-#if defined(WITH_NSS)
+-#include <rpmnss.h>
+-#endif
+ #if defined(WITH_SSL)
+ #include <rpmssl.h>
+ #endif
+-#if defined(WITH_TOMCRYPT)
+-#include <rpmltc.h>
+-#endif
+ 
+ #include <rpmasn.h>
+ #include <rpmtpm.h>
+@@ -467,30 +455,6 @@ static void rpmioAllArgCallback(poptCont
+                 exit(EXIT_FAILURE);
+ #endif
+             }
+-	    else if (!xstrcasecmp(val, "gcrypt") || !xstrcasecmp(val, "gc")) {
+-#if defined(WITH_GCRYPT)
+-		pgpImplVecs = &rpmgcImplVecs;
+-#else
+-                rpmlog(RPMLOG_ERR, "GCrypt (\"gcrypt\") based cryptography implementation not available\n");
+-                exit(EXIT_FAILURE);
+-#endif
+-            }
+-	    else if (!xstrcasecmp(val, "tomcrypt") || !xstrcasecmp(val, "ltc")) {
+-#if defined(WITH_TOMCRYPT)
+-		pgpImplVecs = &rpmltcImplVecs;
+-#else
+-                rpmlog(RPMLOG_ERR, "TomCrypt (\"tomcrypt\") based cryptography implementation not available\n");
+-                exit(EXIT_FAILURE);
+-#endif
+-            }
+-	    else if (!xstrcasecmp(val, "NSS")) {
+-#if defined(WITH_NSS)
+-		pgpImplVecs = &rpmnssImplVecs;
+-#else
+-                rpmlog(RPMLOG_ERR, "Mozilla NSS (\"nss\") based cryptography implementation not available\n");
+-                exit(EXIT_FAILURE);
+-#endif
+-            }
+ 	    else if (!xstrcasecmp(val, "OpenSSL") || !xstrcasecmp(val, "ssl")) {
+ #if defined(WITH_SSL)
+ 		pgpImplVecs = &rpmsslImplVecs;
+@@ -499,14 +463,6 @@ static void rpmioAllArgCallback(poptCont
+                 exit(EXIT_FAILURE);
+ #endif
+             }
+-	    else if (!xstrcasecmp(val, "CDSA")) {
+-#if defined(WITH_CDSA)
+-		pgpImplVecs = &rpmcdsaImplVecs;
+-#else
+-                rpmlog(RPMLOG_ERR, "CDSA (\"cdsa\") based cryptography implementation not available\n");
+-                exit(EXIT_FAILURE);
+-#endif
+-            }
+             else {
+                 rpmlog(RPMLOG_ERR, "cryptography implementation \"%s\" not known\n", val);
+                 exit(EXIT_FAILURE);
+Index: rpm-5.4.9/rpmio/rpmpgp.c
+===================================================================
+--- rpm-5.4.9.orig/rpmio/rpmpgp.c
++++ rpm-5.4.9/rpmio/rpmpgp.c
+@@ -13,21 +13,9 @@
+ 
+ #define	_RPMPGP_INTERNAL
+ #include <rpmbc.h>	/* XXX still needs base64 goop */
+-#if defined(WITH_GCRYPT)
+-#include <rpmgc.h>
+-#endif
+-#if defined(WITH_NSS)
+-#include <rpmnss.h>
+-#endif
+ #if defined(WITH_OPENSSL)
+ #include <rpmssl.h>
+ #endif
+-#if defined(WITH_CDSA)
+-#include <rpmcdsa.h>
+-#endif
+-#if defined(WITH_TOMCRYPT)
+-#include <rpmltc.h>
+-#endif
+ #include "debug.h"
+ 
+ /*@access pgpDig @*/
+@@ -52,29 +40,13 @@ pgpImplVecs_t * pgpImplVecs =
+     /* explicit selection (order DOES NOT matter here) */
+ #if defined(USE_CRYPTO_BEECRYPT) && defined(WITH_BEECRYPT)
+ 	&rpmbcImplVecs;
+-#elif defined(USE_CRYPTO_GCRYPT) && defined(WITH_GCRYPT)
+-	&rpmgcImplVecs;
+-#elif defined(USE_CRYPTO_NSS) && defined(WITH_NSS)
+-	&rpmnssImplVecs;
+ #elif defined(USE_CRYPTO_OPENSSL) && defined(WITH_SSL)
+ 	&rpmsslImplVecs;
+-#elif defined(USE_CRYPTO_TOMCRYPT) && defined(WITH_TOMCRYPT)
+-	&rpmltcImplVecs;
+-#elif defined(USE_CRYPTO_CDSA) && defined(WITH_CDSA)
+-	&rpmcdsaImplVecs;
+     /* implict selection (order DOES matter) */
+ #elif defined(WITH_BEECRYPT)
+ 	&rpmbcImplVecs;
+-#elif defined(WITH_GCRYPT)
+-	&rpmgcImplVecs;
+-#elif defined(WITH_NSS)
+-	&rpmnssImplVecs;
+ #elif defined(WITH_SSL)
+ 	&rpmsslImplVecs;
+-#elif defined(WITH_TOMCRYPT)
+-	&rpmltcImplVecs;
+-#elif defined(WITH_CDSA)
+-	&rpmcdsaImplVecs;
+ #else
+ #error INTERNAL ERROR: no suitable Cryptography library available
+ #endif
+@@ -1343,12 +1315,6 @@ int pgpExportPubkey(pgpDig dig)
+ 	rc = rpmbcExportPubkey(dig);
+     if (pgpImplVecs == &rpmsslImplVecs)
+ 	rc = rpmsslExportPubkey(dig);
+-    if (pgpImplVecs == &rpmnssImplVecs)
+-	rc = rpmnssExportPubkey(dig);
+-    if (pgpImplVecs == &rpmgcImplVecs)
+-	rc = rpmgcExportPubkey(dig);
+-    if (pgpImplVecs == &rpmltcImplVecs)
+-	rc = rpmltcExportPubkey(dig);
+     return rc;
+ }
+ 
+@@ -1360,12 +1326,6 @@ int pgpExportSignature(pgpDig dig, DIGES
+ 	rc = rpmbcExportSignature(dig, ctx);
+     if (pgpImplVecs == &rpmsslImplVecs)
+ 	rc = rpmsslExportSignature(dig, ctx);
+-    if (pgpImplVecs == &rpmnssImplVecs)
+-	rc = rpmnssExportSignature(dig, ctx);
+-    if (pgpImplVecs == &rpmgcImplVecs)
+-	rc = rpmgcExportSignature(dig, ctx);
+-    if (pgpImplVecs == &rpmltcImplVecs)
+-	rc = rpmltcExportSignature(dig, ctx);
+     return rc;
+ }
+ 

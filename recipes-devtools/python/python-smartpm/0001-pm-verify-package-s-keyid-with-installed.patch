@@ -1,0 +1,63 @@
+From 8da3619d715265f2cad7ba6d0882e5644b451dc0 Mon Sep 17 00:00:00 2001
+From: Yunguo Wei <yunguo.wei@windriver.com>
+Date: Fri, 31 Mar 2017 05:30:19 +0000
+Subject: [PATCH] pm: verify package's keyid with installed
+
+Some RPMs are built with self signed with random keys, like this:
+
+linux-firmware-0.0+git0+38e5405c96-r0.0.all.rpm:
+    Header V4 DSA/SHA1 Signature, key ID 153804d9: NOKEY
+    Header SHA1 digest: OK (d1e1b664cdd798d5886ef78e00553648ab754190)
+    MD5 digest: OK (e5ae91b87abbd5e0235e58b00e4c2072)
+
+But these self signed RPMs could be verified pass by rpm5, so we have
+smart to check if the signed key is imported in system. If not, smart
+will assume verification failed and refuse to install the package.
+
+However, if a package is not self signed, but signed with a key that is
+not imported in the system, rpm5 can handle it and return verification
+failed. So this commit doesn't have to worry about that scenario.
+
+Signed-off-by: Yunguo Wei <yunguo.wei@windriver.com>
+---
+ smart/backends/rpm/pm.py | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/smart/backends/rpm/pm.py b/smart/backends/rpm/pm.py
+index 7b651b5..8612009 100644
+--- a/smart/backends/rpm/pm.py
++++ b/smart/backends/rpm/pm.py
+@@ -24,6 +24,7 @@ import tempfile
+ import sys, os
+ import codecs
+ import locale
++import commands
+ 
+ from smart.util.filetools import setCloseOnExec
+ from smart.sorter import ChangeSetSorter
+@@ -183,6 +184,22 @@ class RPMPackageManager(PackageManager):
+                     if sysconf.get("rpm-check-signatures", True):
+                          if get_public_key(h) == '(none)':
+                              raise rpm.error('package is not signed')
++                         else:
++                              (cstatus, coutput) = commands.getstatusoutput("rpm -Kv %s |grep 'signature: OK'|grep 'key ID '" %(path))
++                              idx = coutput.find('key ID ')+7
++                              keyid = coutput[idx:].strip()
++                              # retrieve pubkey in system
++                              (cstatus, coutput) = commands.getstatusoutput("rpm -q gpg-pubkey |cut -d- -f3 |xargs")
++                              key_matched = 0
++                              pubkeys = coutput.split()
++                              if (not cstatus) and pubkeys:
++                                  for pubkey in pubkeys:
++                                     if keyid.lower() == pubkey.lower():
++                                         key_matched = 1
++                                         break
++                              if key_matched == 0:
++                                  raise rpm.error('public key not available!')
++
+                 except rpm.error, e:
+                     os.close(fd)
+                     raise Error, "%s: %s" % (os.path.basename(path), e)
+-- 
+2.9.3
+

@@ -1,0 +1,122 @@
+From 20b5712d02d80eca685a838182cce17d025ac071 Mon Sep 17 00:00:00 2001
+From: Haiqing Bai <Haiqing.Bai@windriver.com>
+Date: Thu, 17 Mar 2016 17:57:41 +0800
+Subject: [PATCH] Fix rpm error after openssl disabled weak cipher.
+
+After openssl disabled ecdsa cipher, rpmssl.c failed
+to build, this fix added the contional compile macro
+to the ecdsa related code.
+
+Signed-off-by: Haiqing Bai <Haiqing.Bai@windriver.com>
+---
+ rpmio/rpmssl.c | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/rpmio/rpmssl.c b/rpmio/rpmssl.c
+index 9abc498..f7aa6fb 100644
+--- a/rpmio/rpmssl.c
++++ b/rpmio/rpmssl.c
+@@ -591,9 +591,11 @@ exit:
+     if (rc == 1) {
+ 	/* XXX OpenSSL BUG(iirc): ensure that the asn1 flag is set. */
+ 	if (EVP_PKEY_type(ssl->pkey->type) == EVP_PKEY_EC) {
++#if !defined(OPENSSL_NO_ECDSA)
+ 	    EC_KEY * ec = EVP_PKEY_get1_EC_KEY(ssl->pkey);
+ 	    EC_KEY_set_asn1_flag(ec, OPENSSL_EC_NAMED_CURVE);
+ 	    EC_KEY_free(ec);
++#endif
+ 	}
+     } else {
+ 	if (ssl->pkey)
+@@ -693,10 +695,12 @@ assert(xx);
+ 	ssl->dsa = NULL;
+ 	break;
+     case 50:		/* ECDSA r */
++#if !defined(OPENSSL_NO_ECDSA)
+ assert(ssl->ecdsasig == NULL);
+ 	ssl->qbits = mbits;
+ 	ssl->ecdsasig = ECDSA_SIG_new();
+ 	ssl->ecdsasig->r = BN_bin2bn(p+2, nb-2, ssl->ecdsasig->r);
++#endif
+ 	break;
+     case 51:		/* ECDSA s */
+ #if !defined(OPENSSL_NO_ECDSA)
+@@ -760,9 +764,10 @@ fprintf(stderr, "      OID[%4u]: %s\n", nb, pgpHexStr(p, nb));
+     case 61:		/* ECDSA Q */
+ 	mbits = pgpMpiBits(p);
+         nb = pgpMpiLen(p);
++        {
+ #if !defined(OPENSSL_NO_ECDSA)
+ assert(ssl->nid);
+-      {	EC_KEY * ec = EC_KEY_new_by_curve_name(ssl->nid);
++	EC_KEY * ec = EC_KEY_new_by_curve_name(ssl->nid);
+ 	const unsigned char *q;
+ 
+ assert(ec);
+@@ -821,6 +826,7 @@ void rpmsslClean(void * impl)
+ 	    BN_free(ssl->hm);
+ 	ssl->hm = NULL;
+ 
++#if !defined(OPENSSL_NO_ECDSA)
+ 	ssl->curveN = _free(ssl->curveN);
+ 	ssl->nid = 0;
+ 	if (ssl->ecdsasig)
+@@ -829,6 +835,7 @@ void rpmsslClean(void * impl)
+ 	if (ssl->priv)
+ 	    BN_free(ssl->priv);
+ 	ssl->priv = NULL;
++#endif
+ 
+ 	if (ssl->pkey)
+ 	    EVP_PKEY_free(ssl->pkey);
+@@ -930,6 +937,7 @@ static void rpmsslVersionLog(void)
+ }
+ #endif
+ 
++#if !defined(OPENSSL_NO_ECDSA)
+     {	size_t nc = EC_get_builtin_curves(NULL, 100);
+ 	EC_builtin_curve * c = alloca(nc * sizeof(*c));
+ 	size_t i;
+@@ -944,6 +952,7 @@ static void rpmsslVersionLog(void)
+ 		o->sn, c[i].nid, pgpHexStr(o->data, o->length), o->ln);
+ 	}
+     }
++#endif
+ 
+     rpmlog(msglvl, "----------\n");
+ }
+@@ -1074,6 +1083,7 @@ assert(0);
+       }	break;
+     case PGPPUBKEYALGO_ECDSA:
+       {
++#if !defined(OPENSSL_NO_ECDSA)
+ 	EC_KEY * ec = EVP_PKEY_get0(ssl->pkey);
+ 	ASN1_OBJECT * o = OBJ_nid2obj(ssl->nid);
+ 	unsigned char *q;
+@@ -1092,6 +1102,7 @@ assert(0);
+ 	be += bn/8;
+ assert(be == q);
+ 
++#endif
+       }	break;
+     }
+ 
+@@ -1268,6 +1279,7 @@ assert(ssl->dsasig == NULL);
+ 	ssl->dsasig = NULL;
+ 	break;
+     case PGPPUBKEYALGO_ECDSA:
++#if !defined(OPENSSL_NO_ECDSA)
+ assert(ssl->ecdsasig == NULL);
+ 	q = ssl->sig;
+ 	ssl->ecdsasig = d2i_ECDSA_SIG(NULL, &q, ssl->siglen);
+@@ -1288,6 +1300,7 @@ assert(ssl->ecdsasig == NULL);
+ 
+ 	ECDSA_SIG_free(ssl->ecdsasig);
+ 	ssl->ecdsasig = NULL;
++#endif
+ 	break;
+     }
+ 
+-- 
+1.9.1
+

@@ -1,0 +1,26 @@
+From fb7c1b6b535e4454b1bd77536326f0ea1d0c3005 Mon Sep 17 00:00:00 2001
+From: jbj <jbj>
+Date: Wed, 14 May 2014 23:05:14 +0000
+Subject: [PATCH 39/46] - coverity #1214080
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+Signed-off-by: Randy MacLeod <Randy.MacLeod@windriver.com>
+---
+ rpmdb/header.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/rpmdb/header.c b/rpmdb/header.c
+index 2f72a05..6c8bb93 100644
+--- a/rpmdb/header.c
++++ b/rpmdb/header.c
+@@ -1398,6 +1398,7 @@ static Header headerMap(const void * uh, int map)
+ 	static const int fdno = -1;
+ 	static const off_t off = 0;
+ 	nuh = mmap(NULL, pvlen, prot, flags, fdno, off);
++assert(nuh != NULL && nuh != (void *)-1);	/* coverity #1214080 */
+ 	if (nuh == NULL || nuh == (void *)-1)
+ 	    fprintf(stderr,
+ 		"==> mmap(%p[%u], 0x%x, 0x%x, %d, 0x%x) error(%d): %s\n",
+-- 
+2.0.1
+

@@ -1,0 +1,49 @@
+From 5dea0913cd048bf54dfb381b8feb38c6e13c2bcc Mon Sep 17 00:00:00 2001
+From: jbj <jbj>
+Date: Fri, 25 Apr 2014 02:42:17 +0000
+Subject: [PATCH 09/46] - sanity
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+Signed-off-by: Randy MacLeod <Randy.MacLeod@windriver.com>
+---
+ rpmio/librpmio.vers | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/rpmio/librpmio.vers b/rpmio/librpmio.vers
+index ce4da25..4bb515d 100644
+--- a/rpmio/librpmio.vers
++++ b/rpmio/librpmio.vers
+@@ -261,6 +261,7 @@ LIBRPMIO_0
+     _pgp_print;
+     pgpExportPubkey;
+     pgpExportSignature;
++    pgpExtractPubkeyFingerprint;
+     pgpFindPubkey;
+     pgpGetPubkey;
+     pgpGetSignature;
+@@ -269,9 +270,11 @@ LIBRPMIO_0
+     pgpGetSig;
+     pgpGetSiglen;
+     pgpGrabPkts;
++    pgpHashAlgo2Name;
+     pgpHashAlgoStringToNumber;
+     pgpHashTbl;
+     pgpImplVecs;
++    pgpHashName2Algo;
+     pgpKeyServerPrefsTbl;
+     pgpPrtComment;
+     pgpPrtKey;
+@@ -283,8 +286,9 @@ LIBRPMIO_0
+     pgpPrtSubType;
+     pgpPrtUserID;
+     pgpPrtVal;
++    pgpPubkeyAlgo2Name;
+     pgpPubkeyFingerprint;
+-    pgpExtractPubkeyFingerprint;
++    pgpPubkeyName2Algo;
+     pgpPktLen;
+     pgpPubkeyTbl;
+     pgpReadPkts;
+-- 
+2.0.1
+

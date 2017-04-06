@@ -1,0 +1,55 @@
+From 8e351ed71d64ce8eb4fd25ccbca9ba9f4052c72d Mon Sep 17 00:00:00 2001
+From: Haiqing Bai <Haiqing.Bai@windriver.com>
+Date: Tue, 1 Dec 2015 13:31:54 +0800
+Subject: [PATCH] Create tmp flag file for autosign rpm packages.
+
+Issue: IDP3-1064
+
+When check the signature, if it is the autosign rpm packages,
+identify it with a file named key ID in tmpfs.
+
+Signed-off-by: Haiqing Bai <Haiqing.Bai@windriver.com>
+---
+ rpmdb/pkgio.c | 19 +++++++++++++++----
+ 1 file changed, 15 insertions(+), 4 deletions(-)
+
+diff --git a/rpmdb/pkgio.c b/rpmdb/pkgio.c
+index 8b7860f..96ea619 100644
+--- a/rpmdb/pkgio.c
++++ b/rpmdb/pkgio.c
+@@ -53,6 +53,7 @@ GENfree(rpmuint32_t *)
+
+ /*@unchecked@*/
+ int _pkgio_debug = 0;
++#define TMPDIR "/tmp/"
+
+ /**
+  */
+@@ -298,10 +299,20 @@ fprintf(stderr, "\t%s: rpmdb  %p[%u]\n", __FUNCTION__, hkp->pkt, (unsigned) hkp-
+ 	    hkp->pkt = (uint8_t *) dig->pub;	dig->pub = NULL;
+ 	    hkp->pktlen = dig->publen;		dig->publen = 0;
+ 	    pubkeysource = xstrdup("package");
+-validate = -1;	/* XXX rpmhkpValidate is prerequisite for rpmhkpFindKey */
+-if (_rpmhkp_debug)
+-fprintf(stderr, "\t%s: auto   %p[%u]\n", __FUNCTION__, hkp->pkt, (unsigned) hkp->pktlen);
+-	}
++            validate = -1;	/* XXX rpmhkpValidate is prerequisite for rpmhkpFindKey */
++
++            /* Create flag file with key ID to identify autosign package*/
++            char pfname[32];
++            FILE *pfile;
++            sprintf(pfname, "%s.%08x", TMPDIR, pgpGrab(sigp->signid+4, 4));
++            if ((pfile = fopen(pfname, "w")) != NULL) {
++                fclose(pfile);
++                pfile = NULL;
++            }
++
++            if (_rpmhkp_debug)
++                fprintf(stderr, "\t%s: auto   %p[%u]\n", __FUNCTION__, hkp->pkt, (unsigned) hkp->pktlen);
++	    }
+     }
+
+     /* Try keyserver lookup. */
+--
+1.9.1
+

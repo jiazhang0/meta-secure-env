@@ -1,0 +1,27 @@
+From 4759930d1d0dda2064ab201e1f467c70db5d1bd5 Mon Sep 17 00:00:00 2001
+From: jbj <jbj>
+Date: Mon, 5 May 2014 19:49:32 +0000
+Subject: [PATCH 32/46] - typo.
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+Signed-off-by: Randy MacLeod <Randy.MacLeod@windriver.com>
+---
+ macros/macros.rpmbuild.in | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/macros/macros.rpmbuild.in b/macros/macros.rpmbuild.in
+index 783aa8b..525f9d5 100644
+--- a/macros/macros.rpmbuild.in
++++ b/macros/macros.rpmbuild.in
+@@ -274,7 +274,7 @@ echo "Patch #%{__patch_number} (%{basename:%{__patch_file}}):" && ( %{uncompress
+ # 	RSA/SHA512
+ # 	ECDSA/SHA224	(using NIST P-224)
+ # 	ECDSA/SHA256	(using NIST P-256)
+-# 	ECDSA/SHA384	(using NIST P-385)
++# 	ECDSA/SHA384	(using NIST P-384)
+ # 	ECDSA/SHA512	(using NIST P-521)
+ #
+ %_build_sign	DSA
+-- 
+2.0.1
+

@@ -53,10 +53,26 @@ python do_import_keys () {
         else:
            raise bb.build.FuncFailed('ERROR: Unable to find private key for rpm signing ...' + \
                    'Please make sure RPM-GPG-PRIVKEY-${RPM_GPG_NAME} is available under %s' % keys_dir)
+
+        # native smart will double check imported keyid even rpm signature check passed with installed pubkey
+        # so native needs to import PUBKEY in order to make sure do_rootfs works as before
+        gpg_pubkey = keys_dir + '/RPM-GPG-KEY-' + d.getVar('RPM_GPG_NAME', True)
+        if os.path.exists(gpg_pubkey):
+            cmd = "%s --root %s --dbpath /var/lib/rpm --import %s > /dev/null" % \
+                (d.getVar('STAGING_BINDIR_NATIVE', True) + '/rpm', \
+                 d.getVar('STAGING_DIR_NATIVE', True), gpg_pubkey)
+
+            status, output = oe.utils.getstatusoutput(cmd)
+            if status:
+                raise bb.build.FuncFailed('Failed to import gpg pub key (%s) to sysroot, fail reason: %s' % \
+                                  (gpg_bpukey, output))
+        else:
+            raise bb.build.FuncFailed('ERROR: Unable to find pubkey(%s) for native rpm ...' % gpg_pubkey)
 }
 
 # sign_rpm depends on do_export_public_keys in oe-core,
 # so keys have been already imported when running sign_rpm
 addtask do_import_keys before do_export_public_keys
 
+do_import_keys[depends] += "rpm-native:do_populate_sysroot"
 do_import_keys[depends] += "gnupg-native:do_populate_sysroot"

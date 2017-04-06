@@ -1,0 +1,126 @@
+From 0c45d60bfec99d019d1a97776299c2b6e0cc1de2 Mon Sep 17 00:00:00 2001
+From: jbj <jbj>
+Date: Sat, 3 May 2014 05:59:24 +0000
+Subject: [PATCH 17/46] - pgp: add crypto stack identifier, use with base64
+ armor.
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+Signed-off-by: Randy MacLeod <Randy.MacLeod@windriver.com>
+---
+ CHANGES        | 1 +
+ rpmio/rpmbc.c  | 1 +
+ rpmio/rpmgc.c  | 1 +
+ rpmio/rpmltc.c | 1 +
+ rpmio/rpmnss.c | 1 +
+ rpmio/rpmpgp.c | 9 ++++++++-
+ rpmio/rpmpgp.h | 1 +
+ rpmio/rpmssl.c | 1 +
+ 8 files changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/CHANGES b/CHANGES
+index 9a5ce26..790425d 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -113,6 +113,7 @@
+     - mdawkins: start rpm-5.4.10 development.
+ 
+ Backports:
++    - jbj: pgp: add crypto stack identifier, use with base64 armor.
+     - jbj: ssl: fix: follow openssl hash disabler conventions (Mark Hatle).
+     - jbj: autoFu: fix: chk libcrypto, not libopenssl, for symbol (Mark Hatle).
+     - jbj: pgp: rework DSA/SHA1 in order to support DSA2 signatures.
+diff --git a/rpmio/rpmbc.c b/rpmio/rpmbc.c
+index a01bbc1..9f0dd8e 100644
+--- a/rpmio/rpmbc.c
++++ b/rpmio/rpmbc.c
+@@ -865,6 +865,7 @@ void * rpmbcInit(void)
+ }
+ 
+ struct pgpImplVecs_s rpmbcImplVecs = {
++	"BeeCrypt 4.2.1",	/* XXX FIXME: add version string to beecrypt */
+ 	rpmbcSetRSA,
+ 	rpmbcSetDSA,
+ 	rpmbcSetELG,
+diff --git a/rpmio/rpmgc.c b/rpmio/rpmgc.c
+index cbe47fb..5bdbe5b 100644
+--- a/rpmio/rpmgc.c
++++ b/rpmio/rpmgc.c
+@@ -987,6 +987,7 @@ void * rpmgcInit(void)
+ }
+ 
+ struct pgpImplVecs_s rpmgcImplVecs = {
++	"Gcrypt " GCRYPT_VERSION,
+ 	rpmgcSetRSA,
+ 	rpmgcSetDSA,
+ 	rpmgcSetELG,
+diff --git a/rpmio/rpmltc.c b/rpmio/rpmltc.c
+index 24b39b5..b00c697 100644
+--- a/rpmio/rpmltc.c
++++ b/rpmio/rpmltc.c
+@@ -906,6 +906,7 @@ void * rpmltcInit(void)
+ }
+ 
+ struct pgpImplVecs_s rpmltcImplVecs = {
++	"TomCrypt " SCRYPT,
+ 	rpmltcSetRSA,
+ 	rpmltcSetDSA,
+ 	rpmltcSetELG,
+diff --git a/rpmio/rpmnss.c b/rpmio/rpmnss.c
+index 7f4779b..666042c 100644
+--- a/rpmio/rpmnss.c
++++ b/rpmio/rpmnss.c
+@@ -1457,6 +1457,7 @@ void * rpmnssInit(void)
+ }
+ 
+ struct pgpImplVecs_s rpmnssImplVecs = {
++	"NSS " NSS_VERSION,
+ 	rpmnssSetRSA,
+ 	rpmnssSetDSA,
+ 	rpmnssSetELG,
+diff --git a/rpmio/rpmpgp.c b/rpmio/rpmpgp.c
+index bdc85e2..0dbdb43 100644
+--- a/rpmio/rpmpgp.c
++++ b/rpmio/rpmpgp.c
+@@ -1703,7 +1703,14 @@ char * pgpArmorWrap(rpmuint8_t atype, const unsigned char * s, size_t ns)
+     /*@-globs@*/
+     t = stpcpy( stpcpy(t, "-----\nVersion: RPM "), VERSION);
+     /*@=globs@*/
+-    t = stpcpy(t, " (BeeCrypt)\n\n");
++
++    if (pgpImplVecs->_pgpNV && pgpImplVecs->_pgpNV[0]) {
++	t = stpcpy(t, " (");
++	t = stpcpy(t, pgpImplVecs->_pgpNV);
++	t = stpcpy(t, ")");
++    }
++
++    t = stpcpy(t, "\n\n");
+ 
+     if ((enc = b64encode(s, ns)) != NULL) {
+ 	t = stpcpy(t, enc);
+diff --git a/rpmio/rpmpgp.h b/rpmio/rpmpgp.h
+index f639208..0440033 100644
+--- a/rpmio/rpmpgp.h
++++ b/rpmio/rpmpgp.h
+@@ -1710,6 +1710,7 @@ typedef void * (*pgpImplInit_t) (void)
+ /**
+  */
+ typedef struct pgpImplVecs_s {
++    const char *	_pgpNV;
+     pgpImplSet_t	_pgpSetRSA;
+     pgpImplSet_t	_pgpSetDSA;
+     pgpImplSet_t	_pgpSetELG;
+diff --git a/rpmio/rpmssl.c b/rpmio/rpmssl.c
+index e18934f..f78cdc1 100644
+--- a/rpmio/rpmssl.c
++++ b/rpmio/rpmssl.c
+@@ -792,6 +792,7 @@ void * rpmsslInit(void)
+ }
+ 
+ struct pgpImplVecs_s rpmsslImplVecs = {
++	OPENSSL_VERSION_TEXT,
+ 	rpmsslSetRSA,
+ 	rpmsslSetDSA,
+ 	rpmsslSetELG,
+-- 
+2.0.1
+

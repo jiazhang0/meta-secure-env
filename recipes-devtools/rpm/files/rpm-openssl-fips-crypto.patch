@@ -1,0 +1,113 @@
+This patch makes rpm use _ONLY_ openssl crypto for signature validation.
+
+Upstream-status: Pending
+
+If OPENSSL_FIPS is configured in the environment, FIPS_mode is enabled.
+If the RPM variable _openssl_fips is defined as '1', FIPS_mode is enabled.
+
+To verify FIPS mode is enabled, inspect the verbose debug log output (-vv).
+
+
+Note: various digest validation functions continue to use beecrypt.
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+
+Index: rpm-5.4.9/rpmio/rpmpgp.c
+===================================================================
+--- rpm-5.4.9.orig/rpmio/rpmpgp.c
++++ rpm-5.4.9/rpmio/rpmpgp.c
+@@ -38,13 +38,9 @@ int _pgp_error_count;
+ /*@unchecked@*/
+ pgpImplVecs_t * pgpImplVecs =
+     /* explicit selection (order DOES NOT matter here) */
+-#if defined(USE_CRYPTO_BEECRYPT) && defined(WITH_BEECRYPT)
+-	&rpmbcImplVecs;
+-#elif defined(USE_CRYPTO_OPENSSL) && defined(WITH_SSL)
++#if defined(USE_CRYPTO_OPENSSL) && defined(WITH_SSL)
+ 	&rpmsslImplVecs;
+     /* implict selection (order DOES matter) */
+-#elif defined(WITH_BEECRYPT)
+-	&rpmbcImplVecs;
+ #elif defined(WITH_SSL)
+ 	&rpmsslImplVecs;
+ #else
+@@ -1311,8 +1307,6 @@ int pgpExportPubkey(pgpDig dig)
+ {
+     int rc = 0;		/* assume failure */
+ 
+-    if (pgpImplVecs == &rpmbcImplVecs)
+-	rc = rpmbcExportPubkey(dig);
+     if (pgpImplVecs == &rpmsslImplVecs)
+ 	rc = rpmsslExportPubkey(dig);
+     return rc;
+@@ -1322,8 +1316,6 @@ int pgpExportSignature(pgpDig dig, DIGES
+ {
+     int rc = 0;		/* assume failure */
+ 
+-    if (pgpImplVecs == &rpmbcImplVecs)
+-	rc = rpmbcExportSignature(dig, ctx);
+     if (pgpImplVecs == &rpmsslImplVecs)
+ 	rc = rpmsslExportSignature(dig, ctx);
+     return rc;
+Index: rpm-5.4.9/rpmio/rpmssl.c
+===================================================================
+--- rpm-5.4.9.orig/rpmio/rpmssl.c
++++ rpm-5.4.9/rpmio/rpmssl.c
+@@ -955,7 +955,7 @@ void * rpmsslInit(void)
+     rpmssl ssl = (rpmssl) xcalloc(1, sizeof(*ssl));
+ 
+     if (rpmssl_initialized++ == 0) {
+-	int xx;
++	static uint32_t enable_fips = 0;
+ 
+ /*@-moduncon@*/
+ #ifdef	NOTYET
+@@ -965,7 +965,16 @@ void * rpmsslInit(void)
+ 	OpenSSL_add_all_algorithms();
+ 	ENGINE_load_builtin_engines();
+ 
+-	xx = FIPS_mode_set(1);
++	enable_fips |= (getenv("OPENSSL_FIPS") != NULL);
++	enable_fips |= rpmExpandNumeric("%{?_openssl_fips}");
++
++	if (enable_fips && !FIPS_mode()) {
++	    if (!FIPS_mode_set(1)) {
++		ERR_print_errors_fp(stdout);
++		rpmlog(RPMLOG_ERR, "FIPS_mode_set(): failed to enter FIPS mode!\n");
++		exit(1);
++            }
++	}
+ 
+ /*@=moduncon@*/
+ 
+Index: rpm-5.4.9/rpmio/poptIO.c
+===================================================================
+--- rpm-5.4.9.orig/rpmio/poptIO.c
++++ rpm-5.4.9/rpmio/poptIO.c
+@@ -7,9 +7,6 @@
+ 
+ #include <poptIO.h>
+ 
+-#if defined(WITH_BEECRYPT)
+-#include <rpmbc.h>
+-#endif
+ #if defined(WITH_SSL)
+ #include <rpmssl.h>
+ #endif
+@@ -447,15 +444,7 @@ static void rpmioAllArgCallback(poptCont
+ #else
+ 	    val = xstrdup(arg);
+ #endif	/* NOTYET */
+-	    if (!xstrcasecmp(val, "beecrypt") || !xstrcasecmp(val, "bc")) {
+-#if defined(WITH_BEECRYPT)
+-		pgpImplVecs = &rpmbcImplVecs;
+-#else
+-                rpmlog(RPMLOG_ERR, "BeeCrypt (\"beecrypt\") based cryptography implementation not available\n");
+-                exit(EXIT_FAILURE);
+-#endif
+-            }
+-	    else if (!xstrcasecmp(val, "OpenSSL") || !xstrcasecmp(val, "ssl")) {
++	    if (!xstrcasecmp(val, "OpenSSL") || !xstrcasecmp(val, "ssl")) {
+ #if defined(WITH_SSL)
+ 		pgpImplVecs = &rpmsslImplVecs;
+ #else

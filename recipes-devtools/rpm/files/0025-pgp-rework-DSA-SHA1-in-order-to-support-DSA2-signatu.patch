@@ -1,0 +1,614 @@
+From 4b615f19d07a38879780c37d557be1c0f4ce279d Mon Sep 17 00:00:00 2001
+From: jbj <jbj>
+Date: Fri, 25 Apr 2014 20:19:32 +0000
+Subject: [PATCH 13/46] - pgp: rework DSA/SHA1 in order to support DSA2
+ signatures.
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+Signed-off-by: Randy MacLeod <Randy.MacLeod@windriver.com>
+---
+ CHANGES                |   1 +
+ lib/rpmchecksig.c      |  13 ++---
+ rpmdb/package.c        |  94 +++++++++++++++---------------------
+ rpmdb/pkgio.c          | 127 ++++++++++++++++++++++++-------------------------
+ rpmdb/signature.c      |  41 ++++++++--------
+ rpmio/rpmhkp.c         |   6 +--
+ rpmio/rpmio_internal.h |   4 +-
+ rpmio/rpmpgp.c         |  18 +++----
+ rpmio/rpmpgp.h         |  12 ++---
+ 9 files changed, 149 insertions(+), 167 deletions(-)
+
+diff --git a/CHANGES b/CHANGES
+index c68a46c..b6c43e4 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -113,6 +113,7 @@
+     - mdawkins: start rpm-5.4.10 development.
+ 
+ Backports:
++    - jbj: pgp: rework DSA/SHA1 in order to support DSA2 signatures.
+     - jbj: bc: add non-repudiable RSA signatures.
+     - jbj: ssl: fix: use ssl->pkey->pkey.dsa, not ssl->dsa, for pubkey export.
+     - jbj: pgp: configurable non-repudiable signature pubkey/hash algos.
+diff --git a/lib/rpmchecksig.c b/lib/rpmchecksig.c
+index 2d016fb..58f6483 100644
+--- a/lib/rpmchecksig.c
++++ b/lib/rpmchecksig.c
+@@ -999,14 +999,15 @@ pgpDig dig = fdGetDig(fd);
+ 		goto exit;
+ 	    }
+ 	    (void) headerGetMagic(NULL, &hmagic, &nmagic);
+-	    dig->hdrsha1ctx = rpmDigestInit(PGPHASHALGO_SHA1, RPMDIGEST_NONE);
++	    /* XXX dig->hsha? */
++	    dig->hdsa = rpmDigestInit(PGPHASHALGO_SHA1, RPMDIGEST_NONE);
+ 	    if (hmagic && nmagic > 0)
+-		(void) rpmDigestUpdate(dig->hdrsha1ctx, hmagic, nmagic);
+-	    (void) rpmDigestUpdate(dig->hdrsha1ctx, he->p.ptr, he->c);
+-	    dig->hdrctx = rpmDigestInit((pgpHashAlgo)dig->signature.hash_algo, RPMDIGEST_NONE);
++		(void) rpmDigestUpdate(dig->hdsa, hmagic, nmagic);
++	    (void) rpmDigestUpdate(dig->hdsa, he->p.ptr, he->c);
++	    dig->hrsa = rpmDigestInit((pgpHashAlgo)dig->signature.hash_algo, RPMDIGEST_NONE);
+ 	    if (hmagic && nmagic > 0)
+-		(void) rpmDigestUpdate(dig->hdrctx, hmagic, nmagic);
+-	    (void) rpmDigestUpdate(dig->hdrctx, he->p.ptr, he->c);
++		(void) rpmDigestUpdate(dig->hrsa, hmagic, nmagic);
++	    (void) rpmDigestUpdate(dig->hrsa, he->p.ptr, he->c);
+ 	    he->p.ptr = _free(he->p.ptr);
+ 	}
+ 	(void)headerFree(h);
+diff --git a/rpmdb/package.c b/rpmdb/package.c
+index ed53aac..be50847 100644
+--- a/rpmdb/package.c
++++ b/rpmdb/package.c
+@@ -79,6 +79,37 @@ static int pgpStashKeyid(pgpDig dig)
+ }
+ #endif
+ 
++static int hBlobDigest(Header h, pgpDig dig, pgpHashAlgo hash_algo,
++		DIGEST_CTX * ctxp)
++{
++    HE_t he = (HE_t) memset(alloca(sizeof(*he)), 0, sizeof(*he));
++    rpmop op = NULL;
++    unsigned char * hmagic = NULL;
++    size_t nmagic = 0;
++    int xx;
++
++    he->tag = RPMTAG_HEADERIMMUTABLE;
++    xx = headerGet(h, he, 0);
++    if (!xx)
++	goto exit;
++    (void) headerGetMagic(NULL, &hmagic, &nmagic);
++    op = (rpmop) pgpStatsAccumulator(dig, 10);	/* RPMTS_OP_DIGEST */
++    (void) rpmswEnter(op, 0);
++    *ctxp = rpmDigestInit(hash_algo, RPMDIGEST_NONE);
++    if (hmagic && nmagic > 0) {
++	(void) rpmDigestUpdate(*ctxp, hmagic, nmagic);
++	dig->nbytes += nmagic;
++    }
++    (void) rpmDigestUpdate(*ctxp, he->p.ptr, he->c);
++    dig->nbytes += he->c;
++    (void) rpmswExit(op, dig->nbytes);
++    op->count--;	/* XXX one too many */
++
++exit:
++    he->p.ptr = _free(he->p.ptr);
++    return xx;
++}
++
+ /*@-mods@*/
+ rpmRC rpmReadPackageFile(rpmts ts, FD_t fd, const char * fn, Header * hdrp)
+ {
+@@ -260,33 +291,8 @@ assert(0);
+ 	    rc = RPMRC_FAIL;
+ 	    goto exit;
+ 	}
+-    {	void * uh = NULL;
+-	rpmTagType uht;
+-	rpmTagCount uhc;
+-	unsigned char * hmagic = NULL;
+-	size_t nmagic = 0;
+-
+-	he->tag = RPMTAG_HEADERIMMUTABLE;
+-	xx = headerGet(h, he, 0);
+-	uht = he->t;
+-	uh = he->p.ptr;
+-	uhc = he->c;
+-	if (!xx)
+-	    break;
+-	(void) headerGetMagic(NULL, &hmagic, &nmagic);
+-	op = (rpmop) pgpStatsAccumulator(dig, 10);	/* RPMTS_OP_DIGEST */
+-	(void) rpmswEnter(op, 0);
+-	dig->hdrctx = rpmDigestInit((pgpHashAlgo)dig->signature.hash_algo, RPMDIGEST_NONE);
+-	if (hmagic && nmagic > 0) {
+-	    (void) rpmDigestUpdate(dig->hdrctx, hmagic, nmagic);
+-	    dig->nbytes += nmagic;
+-	}
+-	(void) rpmDigestUpdate(dig->hdrctx, uh, uhc);
+-	dig->nbytes += uhc;
+-	(void) rpmswExit(op, dig->nbytes);
+-	op->count--;	/* XXX one too many */
+-	uh = _free(uh);
+-    }	break;
++	xx = hBlobDigest(h, dig, dig->signature.hash_algo, &dig->hrsa);
++	break;
+     case RPMSIGTAG_DSA:
+ 	/* Parse the parameters from the OpenPGP packets that will be needed. */
+ 	xx = pgpPktLen(she->p.ui8p, she->c, pp);
+@@ -298,36 +304,12 @@ assert(0);
+ 	    rc = RPMRC_FAIL;
+ 	    goto exit;
+ 	}
+-	/*@fallthrough@*/
++	xx = hBlobDigest(h, dig, dig->signature.hash_algo, &dig->hdsa);
++	break;
+     case RPMSIGTAG_SHA1:
+-    {	void * uh = NULL;
+-	rpmTagType uht;
+-	rpmTagCount uhc;
+-	unsigned char * hmagic = NULL;
+-	size_t nmagic = 0;
+-
+-	he->tag = RPMTAG_HEADERIMMUTABLE;
+-	xx = headerGet(h, he, 0);
+-	uht = he->t;
+-	uh = he->p.ptr;
+-	uhc = he->c;
+-	if (!xx)
+-	    break;
+-	(void) headerGetMagic(NULL, &hmagic, &nmagic);
+-	op = (rpmop) pgpStatsAccumulator(dig, 10);	/* RPMTS_OP_DIGEST */
+-	(void) rpmswEnter(op, 0);
+-	dig->hdrsha1ctx = rpmDigestInit(PGPHASHALGO_SHA1, RPMDIGEST_NONE);
+-	if (hmagic && nmagic > 0) {
+-	    (void) rpmDigestUpdate(dig->hdrsha1ctx, hmagic, nmagic);
+-	    dig->nbytes += nmagic;
+-	}
+-	(void) rpmDigestUpdate(dig->hdrsha1ctx, uh, uhc);
+-	dig->nbytes += uhc;
+-	(void) rpmswExit(op, dig->nbytes);
+-	if ((rpmSigTag)she->tag == RPMSIGTAG_SHA1)
+-	    op->count--;	/* XXX one too many */
+-	uh = _free(uh);
+-    }	break;
++	/* XXX dig->hsha? */
++	xx = hBlobDigest(h, dig, PGPHASHALGO_SHA1, &dig->hdsa);
++	break;
+     case RPMSIGTAG_MD5:
+ 	/* Legacy signatures need the compressed payload in the digest too. */
+ 	op = (rpmop) pgpStatsAccumulator(dig, 10);	/* RPMTS_OP_DIGEST */
+diff --git a/rpmdb/pkgio.c b/rpmdb/pkgio.c
+index 8b7860f..f6a9f5b 100644
+--- a/rpmdb/pkgio.c
++++ b/rpmdb/pkgio.c
+@@ -1010,6 +1010,54 @@ exit:
+ }
+ 
+ /*===============================================*/
++static int hBlobDigest(const void * uh, pgpDig dig, pgpHashAlgo hash_algo,
++	const unsigned char * regionEnd, rpmuint32_t ril, DIGEST_CTX * ctxp)
++{
++    rpmuint32_t * ei = (rpmuint32_t *) uh;
++    rpmuint32_t il = (rpmuint32_t) ntohl(ei[0]);
++    rpmuint32_t dl = (rpmuint32_t) ntohl(ei[1]);
++    entryInfo pe = (entryInfo) &ei[2];
++    rpmuint32_t ildl[2];
++    const unsigned char * dataStart = (const unsigned char *) (pe + il);
++    rpmop op;
++    unsigned char * b = NULL;
++    size_t nb = 0;
++    int xx = 0;
++
++    (void)dl;
++
++    ildl[0] = (rpmuint32_t) htonl(ril);
++    ildl[1] = (rpmuint32_t) (regionEnd - dataStart);
++    ildl[1] = (rpmuint32_t) htonl(ildl[1]);
++
++    op = (rpmop) pgpStatsAccumulator(dig, 10);	/* RPMTS_OP_DIGEST */
++    (void) rpmswEnter(op, 0);
++    *ctxp = rpmDigestInit(hash_algo, RPMDIGEST_NONE);
++
++    (void) headerGetMagic(NULL, &b, &nb);
++    if (b && nb > 0) {
++	(void) rpmDigestUpdate(*ctxp, b, nb);
++	dig->nbytes += nb;
++    }
++
++    b = (unsigned char *) ildl;
++    nb = sizeof(ildl);
++    (void) rpmDigestUpdate(*ctxp, b, nb);
++    dig->nbytes += nb;
++
++    b = (unsigned char *) pe;
++    nb = (size_t) (htonl(ildl[0]) * sizeof(*pe));
++    (void) rpmDigestUpdate(*ctxp, b, nb);
++    dig->nbytes += nb;
++
++    b = (unsigned char *) dataStart;
++    nb = (size_t) htonl(ildl[1]);
++    (void) rpmDigestUpdate(*ctxp, b, nb);
++    dig->nbytes += nb;
++    (void) rpmswExit(op, dig->nbytes);
++
++    return xx;
++}
+ 
+ /**
+  * Check header consistency, performing headerGet() the hard way.
+@@ -1035,20 +1083,17 @@ rpmRC headerCheck(pgpDig dig, const void * uh, size_t uc, const char ** msg)
+ /*@=castexpose@*/
+     rpmuint32_t ildl[2];
+     size_t pvlen = sizeof(ildl) + (il * sizeof(*pe)) + dl;
+-    unsigned char * dataStart = (unsigned char *) (pe + il);
++    const unsigned char * dataStart = (const unsigned char *) (pe + il);
+     indexEntry entry = (indexEntry)
+ 	memset(alloca(sizeof(*entry)), 0, sizeof(*entry));
+     entryInfo info = (entryInfo)
+ 	memset(alloca(sizeof(*info)), 0, sizeof(*info));
+     const void * sig = NULL;
+-    unsigned char * b;
+     rpmVSFlags vsflags = pgpDigVSFlags;
+-    rpmop op;
+     size_t siglen = 0;
+     int blen;
+-    size_t nb;
+     rpmuint32_t ril = 0;
+-    unsigned char * regionEnd = NULL;
++    const unsigned char * regionEnd = NULL;
+     rpmRC rc = RPMRC_FAIL;	/* assume failure */
+     int xx;
+     rpmuint32_t i;
+@@ -1148,6 +1193,7 @@ fprintf(stderr, "--> headerCheck(%p, %p[%u], %p)\n", dig, uh, (unsigned) uc, msg
+ 
+ 	switch (entry->info.tag) {
+ 	case RPMTAG_SHA1HEADER:
++	{   const unsigned char * b;
+ 	    if (vsflags & RPMVSF_NOSHA1HEADER)
+ 		/*@switchbreak@*/ break;
+ 	    blen = 0;
+@@ -1165,7 +1211,7 @@ fprintf(stderr, "--> headerCheck(%p, %p[%u], %p)\n", dig, uh, (unsigned) uc, msg
+ 		*info = entry->info;	/* structure assignment */
+ 		siglen = blen + 1;
+ 	    }
+-	    /*@switchbreak@*/ break;
++	}   /*@switchbreak@*/ break;
+ 	case RPMTAG_RSAHEADER:
+ 	    if (vsflags & RPMVSF_NORSAHEADER)
+ 		/*@switchbreak@*/ break;
+@@ -1235,6 +1281,7 @@ assert(dig != NULL);
+ 	(void) pgpSetSig(dig, info->tag, info->type, sig, info->count);
+     }
+ 
++    /* Verify header signatures/digests. */
+     switch (info->tag) {
+     case RPMTAG_RSAHEADER:
+ 	/* Parse the parameters from the OpenPGP packets that will be needed. */
+@@ -1251,36 +1298,8 @@ assert(dig != NULL);
+ 	    goto exit;
+ 	}
+ 
+-	ildl[0] = (rpmuint32_t) htonl(ril);
+-	ildl[1] = (rpmuint32_t) (regionEnd - dataStart);
+-	ildl[1] = (rpmuint32_t) htonl(ildl[1]);
+-
+-	op = (rpmop) pgpStatsAccumulator(dig, 10);	/* RPMTS_OP_DIGEST */
+-	(void) rpmswEnter(op, 0);
+-	dig->hdrctx = rpmDigestInit((pgpHashAlgo)dig->signature.hash_algo, RPMDIGEST_NONE);
+-
+-	b = NULL; nb = 0;
+-	(void) headerGetMagic(NULL, &b, &nb);
+-	if (b && nb > 0) {
+-	    (void) rpmDigestUpdate(dig->hdrctx, b, nb);
+-	    dig->nbytes += nb;
+-	}
+-
+-	b = (unsigned char *) ildl;
+-	nb = sizeof(ildl);
+-	(void) rpmDigestUpdate(dig->hdrctx, b, nb);
+-	dig->nbytes += nb;
+-
+-	b = (unsigned char *) pe;
+-	nb = (size_t) (htonl(ildl[0]) * sizeof(*pe));
+-	(void) rpmDigestUpdate(dig->hdrctx, b, nb);
+-	dig->nbytes += nb;
+-
+-	b = (unsigned char *) dataStart;
+-	nb = (size_t) htonl(ildl[1]);
+-	(void) rpmDigestUpdate(dig->hdrctx, b, nb);
+-	dig->nbytes += nb;
+-	(void) rpmswExit(op, dig->nbytes);
++	xx = hBlobDigest(uh, dig, dig->signature.hash_algo,
++			regionEnd, ril, &dig->hrsa);
+ 
+ 	break;
+     case RPMTAG_DSAHEADER:
+@@ -1297,38 +1316,16 @@ assert(dig != NULL);
+ 	    rc = RPMRC_FAIL;
+ 	    goto exit;
+ 	}
+-	/*@fallthrough@*/
+-    case RPMTAG_SHA1HEADER:
+-	ildl[0] = (rpmuint32_t) htonl(ril);
+-	ildl[1] = (rpmuint32_t) (regionEnd - dataStart);
+-	ildl[1] = (rpmuint32_t) htonl(ildl[1]);
+-
+-	op = (rpmop) pgpStatsAccumulator(dig, 10);	/* RPMTS_OP_DIGEST */
+-	(void) rpmswEnter(op, 0);
+-	dig->hdrsha1ctx = rpmDigestInit(PGPHASHALGO_SHA1, RPMDIGEST_NONE);
+-
+-	b = NULL; nb = 0;
+-	(void) headerGetMagic(NULL, &b, &nb);
+-	if (b && nb > 0) {
+-	    (void) rpmDigestUpdate(dig->hdrsha1ctx, b, nb);
+-	    dig->nbytes += nb;
+-	}
+ 
+-	b = (unsigned char *) ildl;
+-	nb = sizeof(ildl);
+-	(void) rpmDigestUpdate(dig->hdrsha1ctx, b, nb);
+-	dig->nbytes += nb;
++	xx = hBlobDigest(uh, dig, dig->signature.hash_algo,
++			regionEnd, ril, &dig->hdsa);
+ 
+-	b = (unsigned char *) pe;
+-	nb = (size_t) (htonl(ildl[0]) * sizeof(*pe));
+-	(void) rpmDigestUpdate(dig->hdrsha1ctx, b, nb);
+-	dig->nbytes += nb;
++	break;
++    case RPMTAG_SHA1HEADER:
+ 
+-	b = (unsigned char *) dataStart;
+-	nb = (size_t) htonl(ildl[1]);
+-	(void) rpmDigestUpdate(dig->hdrsha1ctx, b, nb);
+-	dig->nbytes += nb;
+-	(void) rpmswExit(op, dig->nbytes);
++	/* XXX dig->hsha? */
++	xx = hBlobDigest(uh, dig, PGPHASHALGO_SHA1,
++			regionEnd, ril, &dig->hdsa);
+ 
+ 	break;
+     default:
+diff --git a/rpmdb/signature.c b/rpmdb/signature.c
+index bdd1cc6..d7cc002 100644
+--- a/rpmdb/signature.c
++++ b/rpmdb/signature.c
+@@ -737,11 +737,11 @@ exit:
+  * Verify RSA signature.
+  * @param dig		container
+  * @retval t		verbose success/failure text
+- * @param rsactx	RSA digest context
++ * @param hrsa	RSA digest context
+  * @return 		RPMRC_OK on success
+  */
+ static rpmRC
+-verifyRSA(pgpDig dig, /*@out@*/ char * t, /*@null@*/ DIGEST_CTX rsactx)
++verifyRSA(pgpDig dig, /*@out@*/ char * t, /*@null@*/ DIGEST_CTX hrsa)
+ 	/*@globals internalState @*/
+ 	/*@modifies dig, *t, internalState */
+ {
+@@ -754,13 +754,13 @@ verifyRSA(pgpDig dig, /*@out@*/ char * t, /*@null@*/ DIGEST_CTX rsactx)
+     int xx;
+ 
+ if (_rpmhkp_debug)
+-fprintf(stderr, "--> %s(%p,%p,%p) sig %p sigp %p\n", __FUNCTION__, dig, t, rsactx, sig, sigp);
++fprintf(stderr, "--> %s(%p,%p,%p) sig %p sigp %p\n", __FUNCTION__, dig, t, hrsa, sig, sigp);
+ 
+ assert(dig != NULL);
+-assert(rsactx != NULL);
++assert(hrsa != NULL);
+ assert(sigp != NULL);
+ assert(sigp->pubkey_algo == (rpmuint8_t)PGPPUBKEYALGO_RSA);
+-assert(sigp->hash_algo == (rpmuint8_t)rpmDigestAlgo(rsactx));
++assert(sigp->hash_algo == (rpmuint8_t)rpmDigestAlgo(hrsa));
+ assert(pgpGetSigtag(dig) == RPMSIGTAG_RSA);
+ assert(sig != NULL);
+ 
+@@ -771,7 +771,7 @@ assert(sig != NULL);
+ 	goto exit;
+ 
+     *t = '\0';
+-    if (dig->hdrctx == rsactx)
++    if (dig->hrsa == hrsa)
+ 	t = stpcpy(t, _("Header "));
+ 
+     /* Identify the signature version. */
+@@ -782,7 +782,7 @@ assert(sig != NULL);
+     }
+ 
+     /* Identify the RSA/hash. */
+-    {   const char * hashname = rpmDigestName(rsactx);
++    {   const char * hashname = rpmDigestName(hrsa);
+ 	t = stpcpy(t, " RSA");
+ 	if (strcmp(hashname, "UNKNOWN")) {
+ 	    *t++ = '/';
+@@ -792,7 +792,7 @@ assert(sig != NULL);
+     t = stpcpy(t, _(" signature: "));
+ 
+     {	rpmop op = (rpmop)pgpStatsAccumulator(dig, 10);	/* RPMTS_OP_DIGEST */
+-	DIGEST_CTX ctx = rpmDigestDup(rsactx);
++	DIGEST_CTX ctx = rpmDigestDup(hrsa);
+ 
+ 	(void) rpmswEnter(op, 0);
+ 	if (sigp->hash != NULL)
+@@ -840,11 +840,11 @@ exit:
+  * Verify DSA signature.
+  * @param dig		container
+  * @retval t		verbose success/failure text
+- * @param dsactx	DSA digest context
++ * @param hdsa		DSA digest context
+  * @return 		RPMRC_OK on success
+  */
+ static rpmRC
+-verifyDSA(pgpDig dig, /*@out@*/ char * t, /*@null@*/ DIGEST_CTX dsactx)
++verifyDSA(pgpDig dig, /*@out@*/ char * t, /*@null@*/ DIGEST_CTX hdsa)
+ 	/*@globals internalState @*/
+ 	/*@modifies dig, *t, internalState */
+ {
+@@ -857,18 +857,18 @@ verifyDSA(pgpDig dig, /*@out@*/ char * t, /*@null@*/ DIGEST_CTX dsactx)
+     int xx;
+ 
+ if (_rpmhkp_debug)
+-fprintf(stderr, "--> %s(%p,%p,%p) sig %p sigp %p\n", __FUNCTION__, dig, t, dsactx, sig, sigp);
++fprintf(stderr, "--> %s(%p,%p,%p) sig %p sigp %p\n", __FUNCTION__, dig, t, hdsa, sig, sigp);
+ 
+ assert(dig != NULL);
+-assert(dsactx != NULL);
++assert(hdsa != NULL);
+ assert(sigp != NULL);
+ assert(sigp->pubkey_algo == (rpmuint8_t)PGPPUBKEYALGO_DSA);
+-assert(sigp->hash_algo == (rpmuint8_t)rpmDigestAlgo(dsactx));
++assert(sigp->hash_algo == (rpmuint8_t)rpmDigestAlgo(hdsa));
+ assert(pgpGetSigtag(dig) == RPMSIGTAG_DSA);
+ assert(sig != NULL);
+ 
+     *t = '\0';
+-    if (dig != NULL && dig->hdrsha1ctx == dsactx)
++    if (dig != NULL && dig->hdsa == hdsa)
+ 	t = stpcpy(t, _("Header "));
+ 
+     /* Identify the signature version. */
+@@ -879,7 +879,7 @@ assert(sig != NULL);
+     }
+ 
+     /* Identify the DSA/hash. */
+-    {   const char * hashname = rpmDigestName(dsactx);
++    {   const char * hashname = rpmDigestName(hdsa);
+ 	t = stpcpy(t, " DSA");
+ 	if (strcmp(hashname, "UNKNOWN") && strcmp(hashname, "SHA1")) {
+ 	    *t++ = '/';
+@@ -889,7 +889,7 @@ assert(sig != NULL);
+     t = stpcpy(t, _(" signature: "));
+ 
+     {	rpmop op = (rpmop)pgpStatsAccumulator(dig, 10);	/* RPMTS_OP_DIGEST */
+-	DIGEST_CTX ctx = rpmDigestDup(dsactx);
++	DIGEST_CTX ctx = rpmDigestDup(hdsa);
+ 
+ 	(void) rpmswEnter(op, 0);
+ 	if (sigp->hash != NULL)
+@@ -937,7 +937,7 @@ exit:
+     }
+ 
+ if (_rpmhkp_debug)
+-fprintf(stderr, "<-- %s(%p,%p,%p) res %d %s\n", __FUNCTION__, dig, t, dsactx, res, t);
++fprintf(stderr, "<-- %s(%p,%p,%p) res %d %s\n", __FUNCTION__, dig, t, hdsa, res, t);
+ 
+     return res;
+ }
+@@ -970,15 +970,16 @@ pubp = pgpGetPubkey(dig);
+ 	res = verifyMD5(dig, result, dig->md5ctx);
+ 	break;
+     case RPMSIGTAG_SHA1:
+-	res = verifySHA1(dig, result, dig->hdrsha1ctx);
++	/* XXX dig->hsha? */
++	res = verifySHA1(dig, result, dig->hdsa);
+ 	break;
+     case RPMSIGTAG_RSA:
+ pubp->pubkey_algo = PGPPUBKEYALGO_RSA;
+-	res = verifyRSA(dig, result, dig->hdrctx);
++	res = verifyRSA(dig, result, dig->hrsa);
+ 	break;
+     case RPMSIGTAG_DSA:
+ pubp->pubkey_algo = PGPPUBKEYALGO_DSA;
+-	res = verifyDSA(dig, result, dig->hdrsha1ctx);
++	res = verifyDSA(dig, result, dig->hdsa);
+ 	break;
+     default:
+ 	sprintf(result, _("Signature: UNKNOWN (%u)\n"), (unsigned)sigtag);
+diff --git a/rpmio/rpmhkp.c b/rpmio/rpmhkp.c
+index 000c0f9..f4ce117 100644
+--- a/rpmio/rpmhkp.c
++++ b/rpmio/rpmhkp.c
+@@ -1147,12 +1147,12 @@ void _rpmhkpDumpDig(const char * msg, pgpDig dig)
+     fprintf(stderr, "\t     ppkts: %p[%u]\n", dig->ppkts, dig->npkts);
+     fprintf(stderr, "\t    nbytes: 0x%08x\n", (unsigned) dig->nbytes);
+ 
+-    fprintf(stderr, "\t   sha1ctx: %p\n", dig->sha1ctx);
+-    fprintf(stderr, "\thdrsha1ctx: %p\n", dig->hdrsha1ctx);
++    fprintf(stderr, "\t      hsha: %p\n", dig->hsha);
++    fprintf(stderr, "\t      hdsa: %p\n", dig->hdsa);
+     fprintf(stderr, "\t      sha1: %p[%u]\n", dig->sha1, (unsigned) dig->sha1len);
+ 
+     fprintf(stderr, "\t    md5ctx: %p\n", dig->md5ctx);
+-    fprintf(stderr, "\t    hdrctx: %p\n", dig->hdrctx);
++    fprintf(stderr, "\t      hrsa: %p\n", dig->hrsa);
+     fprintf(stderr, "\t       md5: %p[%u]\n", dig->md5, (unsigned) dig->md5len);
+     fprintf(stderr, "\t      impl: %p\n", dig->impl);
+ 
+diff --git a/rpmio/rpmio_internal.h b/rpmio/rpmio_internal.h
+index 684c1c6..59dbb95 100644
+--- a/rpmio/rpmio_internal.h
++++ b/rpmio/rpmio_internal.h
+@@ -633,9 +633,9 @@ assert(dig->md5ctx == NULL);
+ 	case PGPHASHALGO_SHA256:
+ 	case PGPHASHALGO_SHA384:
+ 	case PGPHASHALGO_SHA512:
+-assert(dig->sha1ctx == NULL);
++assert(dig->hsha == NULL);
+ /*@-assignexpose -onlytrans@*/
+-	    dig->sha1ctx = ctx;
++	    dig->hsha = ctx;
+ /*@=assignexpose =onlytrans@*/
+ 	    fd->digests[i] = NULL;
+ 	    /*@switchbreak@*/ break;
+diff --git a/rpmio/rpmpgp.c b/rpmio/rpmpgp.c
+index 54bba08..bdc85e2 100644
+--- a/rpmio/rpmpgp.c
++++ b/rpmio/rpmpgp.c
+@@ -1220,17 +1220,17 @@ static void pgpDigFini(void * __dig)
+     yarnPossess(dig->_item.use);
+ #endif
+ 
+-    if (dig->hdrctx != NULL)
+-	(void) rpmDigestFinal(dig->hdrctx, NULL, NULL, 0);
+-    dig->hdrctx = NULL;
++    if (dig->hrsa != NULL)
++	(void) rpmDigestFinal(dig->hrsa, NULL, NULL, 0);
++    dig->hrsa = NULL;
+ 
+-    if (dig->hdrsha1ctx != NULL)
+-	(void) rpmDigestFinal(dig->hdrsha1ctx, NULL, NULL, 0);
+-    dig->hdrsha1ctx = NULL;
++    if (dig->hdsa != NULL)
++	(void) rpmDigestFinal(dig->hdsa, NULL, NULL, 0);
++    dig->hdsa = NULL;
+ 
+-    if (dig->sha1ctx != NULL)
+-	(void) rpmDigestFinal(dig->sha1ctx, NULL, NULL, 0);
+-    dig->sha1ctx = NULL;
++    if (dig->hsha != NULL)
++	(void) rpmDigestFinal(dig->hsha, NULL, NULL, 0);
++    dig->hsha = NULL;
+ 
+ #ifdef	NOTYET
+     if (dig->hdrmd5ctx != NULL)
+diff --git a/rpmio/rpmpgp.h b/rpmio/rpmpgp.h
+index 02b994c..f639208 100644
+--- a/rpmio/rpmpgp.h
++++ b/rpmio/rpmpgp.h
+@@ -86,17 +86,17 @@ struct pgpDig_s {
+     size_t nbytes;		/*!< No. bytes of plain text. */
+ 
+ /*@only@*/ /*@null@*/
+-    DIGEST_CTX sha1ctx;		/*!< (dsa) sha1 hash context. */
++    DIGEST_CTX hsha;		/*!< header hash context. */
+ /*@only@*/ /*@null@*/
+-    DIGEST_CTX hdrsha1ctx;	/*!< (dsa) header sha1 hash context. */
++    DIGEST_CTX hdsa;		/*!< (dsa) header sha1 hash context. */
+ /*@only@*/ /*@null@*/
+-    void * sha1;		/*!< (dsa) V3 signature hash. */
+-    size_t sha1len;		/*!< (dsa) V3 signature hash length. */
++    void * sha1;		/*!< (dsa) signature hash. */
++    size_t sha1len;		/*!< (dsa) signature hash length. */
+ 
+ /*@only@*/ /*@null@*/
+-    DIGEST_CTX md5ctx;		/*!< (rsa) md5 hash context. */
++    DIGEST_CTX md5ctx;		/*!< (md5) hash context. */
+ /*@only@*/ /*@null@*/
+-    DIGEST_CTX hdrctx;		/*!< (rsa) header hash context. */
++    DIGEST_CTX hrsa;		/*!< (rsa) header hash context. */
+ /*@only@*/ /*@null@*/
+     void * md5;			/*!< (rsa) signature hash. */
+     size_t md5len;		/*!< (rsa) signature hash length. */
+-- 
+2.0.1
+

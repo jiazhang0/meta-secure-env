@@ -1,0 +1,58 @@
+From 3dd8d822b0e3ed587586a7809ae3eaf3fe9826aa Mon Sep 17 00:00:00 2001
+From: jbj <jbj>
+Date: Fri, 16 May 2014 20:31:05 +0000
+Subject: [PATCH 46/46] - fix: make sure the rpmgi ref is released on gpg
+ invocation errors.
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+Signed-off-by: Randy MacLeod <Randy.MacLeod@windriver.com>
+---
+ CHANGES           | 1 +
+ lib/rpmchecksig.c | 6 +++---
+ 2 files changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/CHANGES b/CHANGES
+index f6cd112..279fb89 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -113,6 +113,7 @@
+     - mdawkins: start rpm-5.4.10 development.
+ 
+ Backports:
++    - jbj: fix: make sure the rpmgi ref is released on gpg invocation errors.
+     - jbj: ssl: ensure bit counts are correct.
+     - jbj: bc: stub in ECDSA parameters, ensure bit counts are correct.
+     - jbj: ssl: prefer/use non-repudiable ecdsa signature.
+diff --git a/lib/rpmchecksig.c b/lib/rpmchecksig.c
+index c25869c..98b8b4c 100644
+--- a/lib/rpmchecksig.c
++++ b/lib/rpmchecksig.c
+@@ -348,7 +348,7 @@ if (sigh != NULL) {
+ 		he->tag = (rpmTag)sigs[i];
+ 		xx = headerDel(sigh, he, 0);
+ 	    }
+-	} else {		/* If gpg/pgp is configured, replace the signature. */
++	} else {	/* If gpg/pgp is configured, replace the signature. */
+ 	  int addsig = 0;
+ 	  sigtag = RPMSIGTAG_GPG;
+ 	  addsig = 1;
+@@ -485,14 +485,14 @@ if (sigh != NULL) {
+     if (rpmrc == RPMRC_NOTFOUND)
+         rpmrc = (rpmRC) rpmgiRc(gi);
+ 
+-    gi = rpmgiFree(gi);
+-
+  }	/* end-of-arg-iteration */
+ 
+     if (rpmrc == RPMRC_OK)
+ 	res = 0;
+ 
+ exit:
++    gi = rpmgiFree(gi);
++
+     if (fd)	(void) manageFile(&fd, NULL, 0, res);
+     if (ofd)	(void) manageFile(&ofd, NULL, 0, res);
+ 
+-- 
+2.0.1
+

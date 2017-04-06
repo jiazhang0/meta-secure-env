@@ -1,0 +1,29 @@
+From 8df57460083bb0717fda54a3cfab88f0f6ac5921 Mon Sep 17 00:00:00 2001
+From: jbj <jbj>
+Date: Fri, 25 Apr 2014 20:05:50 +0000
+Subject: [PATCH 12/46] - pgp: ensure pubkey/algo names are initialized.
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+Signed-off-by: Randy MacLeod <Randy.MacLeod@windriver.com>
+---
+ tests/tpgp.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/tests/tpgp.c b/tests/tpgp.c
+index f99c026..0b29d57 100644
+--- a/tests/tpgp.c
++++ b/tests/tpgp.c
+@@ -63,8 +63,10 @@ rpmRC generateTest(rpmts ts, const char * text, int pubkey_algo, int hash_algo)
+     int xx;
+ 
+     pubp->pubkey_algo = pubkey_algo;
++    dig->pubkey_algoN = pgpPubkeyAlgo2Name(pubp->pubkey_algo);
+     sigp->pubkey_algo = pubkey_algo;
+     sigp->hash_algo = hash_algo;
++    dig->hash_algoN = pgpHashAlgo2Name(sigp->hash_algo);
+ 
+     xx = pgpImplGenerate(dig);
+     if (xx) {
+-- 
+2.0.1
+

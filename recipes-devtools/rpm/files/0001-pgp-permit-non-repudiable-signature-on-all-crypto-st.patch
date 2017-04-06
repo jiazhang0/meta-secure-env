@@ -1,0 +1,1152 @@
+From 2743b89b6762b19b07984654cdfeae6c078bfd77 Mon Sep 17 00:00:00 2001
+From: jbj <jbj>
+Date: Fri, 11 Apr 2014 16:34:37 +0000
+Subject: [PATCH] - pgp: permit non-repudiable signature on all crypto stacks.
+
+Signed-off-by: Mark Hatle <mark.hatle@windriver.com>
+Signed-off-by: Randy MacLeod <Randy.MacLeod@windriver.com>
+---
+ CHANGES             |   1 +
+ build/pack.c        |   2 +-
+ rpmio/librpmio.vers |   5 +-
+ rpmio/rpmbc.c       |   1 +
+ rpmio/rpmbc.h       |   5 ++
+ rpmio/rpmgc.c       | 207 +++++++++++++++++++++++++++++++++++++++++++++++++++-
+ rpmio/rpmgc.h       |   5 ++
+ rpmio/rpmltc.c      | 199 +++++++++++++++++++++++++++++++++++++++++++++++++-
+ rpmio/rpmltc.h      |   5 ++
+ rpmio/rpmnss.c      | 203 ++++++++++++++++++++++++++++++++++++++++++++++++++-
+ rpmio/rpmnss.h      |   5 ++
+ rpmio/rpmpgp.c      |  50 ++++++++++++-
+ rpmio/rpmpgp.h      |   9 ++-
+ rpmio/rpmssl.c      | 194 +++++++++++++++++++++++++++++++++++++++++++++++-
+ rpmio/rpmssl.h      |   5 ++
+ 15 files changed, 880 insertions(+), 16 deletions(-)
+
+diff --git a/CHANGES b/CHANGES
+index e3176e1..18e1ac5 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -113,6 +113,7 @@
+     - mdawkins: start rpm-5.4.10 development.
+ 
+ Backports:
++    - jbj: pgp: permit non-repudiable signature on all crypto stacks.
+     - jbj: cipher: stub-in cipher methods and object.
+ 5.4.8 -> 5.4.9: 
+     - mdawkins:	applied mdv patch rpm-5.4.4-find-debuginfo-add-missing-partial-strip.patch
+diff --git a/build/pack.c b/build/pack.c
+index 1d8664f..64026c9 100644
+--- a/build/pack.c
++++ b/build/pack.c
+@@ -837,7 +837,7 @@ sigp->signhash16[1] = (rpmuint8_t) (nibble(SHA1[2]) << 4) | nibble(SHA1[3]);
+ 
+ 	/* Sign the header SHA1. */
+ 	if (ctx)
+-	    rpmbcExportSignature(dig, ctx);
++	    xx = pgpExportSignature(dig, ctx);
+ 
+     }
+ 
+diff --git a/rpmio/librpmio.vers b/rpmio/librpmio.vers
+index 6ef5768..ce4da25 100644
+--- a/rpmio/librpmio.vers
++++ b/rpmio/librpmio.vers
+@@ -259,6 +259,8 @@ LIBRPMIO_0
+     _pgp_debug;
+     _pgp_error_count;
+     _pgp_print;
++    pgpExportPubkey;
++    pgpExportSignature;
+     pgpFindPubkey;
+     pgpGetPubkey;
+     pgpGetSignature;
+@@ -342,8 +344,6 @@ LIBRPMIO_0
+     rpmbagAdd;
+     rpmbagDel;
+     rpmbagNew;
+-    rpmbcExportPubkey;
+-    rpmbcExportSignature;
+     rpmbcImplVecs;
+     _rpmbf_debug;
+     rpmbfFree;
+@@ -357,6 +357,7 @@ LIBRPMIO_0
+     rpmbfUnion;
+     rpmcdsaImplVecs;
+     _cph_debug;
++    _cphParam;
+     rpmCipherInit;
+     rpmCipherNext;
+     rpmCipherFinal;
+diff --git a/rpmio/rpmbc.c b/rpmio/rpmbc.c
+index dc87651..ea7a97c 100644
+--- a/rpmio/rpmbc.c
++++ b/rpmio/rpmbc.c
+@@ -1001,6 +1001,7 @@ int rpmbcExportSignature(pgpDig dig, /*@only@*/ DIGEST_CTX ctx)
+     sigp->signhash16[0] = h[0];
+     sigp->signhash16[1] = h[1];
+ 
++    /* XXX pgpImplVec forces "--usecrypto foo" to also be used */
+     xx = pgpImplSign(dig);
+ assert(xx == 1);
+ 
+diff --git a/rpmio/rpmbc.h b/rpmio/rpmbc.h
+index 2042a58..862e10b 100644
+--- a/rpmio/rpmbc.h
++++ b/rpmio/rpmbc.h
+@@ -74,4 +74,9 @@ dldp_p elg_params;
+ /*@unchecked@*/
+ extern pgpImplVecs_t rpmbcImplVecs;
+ 
++int rpmbcExportPubkey(pgpDig dig)
++	/*@*/;
++int rpmbcExportSignature(pgpDig dig, /*@only@*/ DIGEST_CTX ctx)
++	/*@*/;
++
+ #endif	/* H_RPMBC */
+diff --git a/rpmio/rpmgc.c b/rpmio/rpmgc.c
+index 897ee12..cbe47fb 100644
+--- a/rpmio/rpmgc.c
++++ b/rpmio/rpmgc.c
+@@ -369,6 +369,11 @@ if (_pgp_debug < 0) rpmgcDump("gc->hash", gc->hash);
+ 
+     /* Compare leading 16 bits of digest for quick check. */
+     rc = memcmp(gc->digest, sigp->signhash16, sizeof(sigp->signhash16));
++
++    /* XXX FIXME: avoid spurious "BAD" error msg while signing. */
++    if (rc && sigp->signhash16[0] == 0 && sigp->signhash16[1] == 0)
++	rc = 0;
++
+ SPEW(0, !rc, dig);
+     return rc;
+ }
+@@ -995,5 +1000,205 @@ struct pgpImplVecs_s rpmgcImplVecs = {
+ 	rpmgcFree, rpmgcInit
+ };
+ 
+-#endif
++int rpmgcExportPubkey(pgpDig dig)
++{
++    uint8_t pkt[8192];
++    uint8_t * be = pkt;
++    size_t pktlen;
++    time_t now = time(NULL);
++    uint32_t bt = now;
++    uint16_t bn;
++    pgpDigParams pubp = pgpGetPubkey(dig);
++    rpmgc gc = (rpmgc) dig->impl;
++    int xx;
++
++    *be++ = 0x80 | (PGPTAG_PUBLIC_KEY << 2) | 0x01;
++    be += 2;
++
++    *be++ = 0x04;
++    *be++ = (bt >> 24);
++    *be++ = (bt >> 16);
++    *be++ = (bt >>  8);
++    *be++ = (bt      );
++    *be++ = pubp->pubkey_algo;
++
++assert(gc->pub_key);
++xx = gcry_sexp_extract_param (gc->pub_key, NULL, "p q g y", &gc->p, &gc->q, &gc->g, &gc->y, NULL);
++assert(gc->p);
++assert(gc->q);
++assert(gc->g);
++assert(gc->y);
++    bn = gcry_mpi_get_nbits(gc->p);
++    bn += 7; bn &= ~7;
++    *be++ = (bn >> 8);	*be++ = (bn     );
++    xx = gcry_mpi_print(GCRYMPI_FMT_USG, be, bn/8, NULL, gc->p);
++    be += bn/8;
++
++    bn = gcry_mpi_get_nbits(gc->q);
++    bn += 7; bn &= ~7;
++    *be++ = (bn >> 8);	*be++ = (bn     );
++    xx = gcry_mpi_print(GCRYMPI_FMT_USG, be, bn/8, NULL, gc->q);
++    be += bn/8;
++
++    bn = gcry_mpi_get_nbits(gc->g);
++    bn += 7; bn &= ~7;
++    *be++ = (bn >> 8);	*be++ = (bn     );
++    xx = gcry_mpi_print(GCRYMPI_FMT_USG, be, bn/8, NULL, gc->g);
++    be += bn/8;
++
++    bn = gcry_mpi_get_nbits(gc->y);
++    bn += 7; bn &= ~7;
++    *be++ = (bn >> 8);	*be++ = (bn     );
++    xx = gcry_mpi_print(GCRYMPI_FMT_USG, be, bn/8, NULL, gc->y);
++    be += bn/8;
++
++    pktlen = (be - pkt);
++    bn = pktlen - 3;
++    pkt[1] = (bn >> 8);
++    pkt[2] = (bn     );
++
++    xx = pgpPubkeyFingerprint(pkt, pktlen, pubp->signid);
++
++    dig->pub = memcpy(xmalloc(pktlen), pkt, pktlen);
++    dig->publen = pktlen;
++
++    return 0;
++}
++
++int rpmgcExportSignature(pgpDig dig, /*@only@*/ DIGEST_CTX ctx)
++{
++    uint8_t pkt[8192];
++    uint8_t * be = pkt;
++    uint8_t * h;
++    size_t pktlen;
++    time_t now = time(NULL);
++    uint32_t bt;
++    uint16_t bn;
++    pgpDigParams pubp = pgpGetPubkey(dig);
++    pgpDigParams sigp = pgpGetSignature(dig);
++    rpmgc gc = (rpmgc) dig->impl;
++    int xx;
++
++    sigp->tag = PGPTAG_SIGNATURE;
++    *be++ = 0x80 | (sigp->tag << 2) | 0x01;
++    be += 2;				/* pktlen */
++
++    sigp->hash = be;
++    *be++ = sigp->version = 0x04;		/* version */
++    *be++ = sigp->sigtype = PGPSIGTYPE_BINARY;	/* sigtype */
++    *be++ = sigp->pubkey_algo = pubp->pubkey_algo;	/* pubkey_algo */
++    *be++ = sigp->hash_algo;		/* hash_algo */
++
++    be += 2;				/* skip hashd length */
++    h = (uint8_t *) be;
++
++    *be++ = 1 + 4;			/* signature creation time */
++    *be++ = PGPSUBTYPE_SIG_CREATE_TIME;
++    bt = now;
++    *be++ = sigp->time[0] = (bt >> 24);
++    *be++ = sigp->time[1] = (bt >> 16);
++    *be++ = sigp->time[2] = (bt >>  8);
++    *be++ = sigp->time[3] = (bt      );
++
++    *be++ = 1 + 4;			/* signature expiration time */
++    *be++ = PGPSUBTYPE_SIG_EXPIRE_TIME;
++    bt = 30 * 24 * 60 * 60;		/* XXX 30 days from creation */
++    *be++ = sigp->expire[0] = (bt >> 24);
++    *be++ = sigp->expire[1] = (bt >> 16);
++    *be++ = sigp->expire[2] = (bt >>  8);
++    *be++ = sigp->expire[3] = (bt      );
++
++/* key expiration time (only on a self-signature) */
++
++    *be++ = 1 + 1;			/* exportable certification */
++    *be++ = PGPSUBTYPE_EXPORTABLE_CERT;
++    *be++ = 0;
++
++    *be++ = 1 + 1;			/* revocable */
++    *be++ = PGPSUBTYPE_REVOCABLE;
++    *be++ = 0;
++
++/* notation data */
++
++    sigp->hashlen = (be - h);		/* set hashed length */
++    h[-2] = (sigp->hashlen >> 8);
++    h[-1] = (sigp->hashlen     );
++    sigp->hashlen += sizeof(struct pgpPktSigV4_s);
++
++    if (sigp->hash != NULL)
++	xx = rpmDigestUpdate(ctx, sigp->hash, sigp->hashlen);
++
++    if (sigp->version == (rpmuint8_t) 4) {
++	uint8_t trailer[6];
++	trailer[0] = sigp->version;
++	trailer[1] = (rpmuint8_t)0xff;
++	trailer[2] = (sigp->hashlen >> 24);
++	trailer[3] = (sigp->hashlen >> 16);
++	trailer[4] = (sigp->hashlen >>  8);
++	trailer[5] = (sigp->hashlen      );
++	xx = rpmDigestUpdate(ctx, trailer, sizeof(trailer));
++    }
++
++    sigp->signhash16[0] = 0x00;
++    sigp->signhash16[1] = 0x00;
++    xx = pgpImplSetDSA(ctx, dig, sigp);	/* XXX signhash16 check always fails */
++    h = (uint8_t *) gc->digest;
++    sigp->signhash16[0] = h[0];
++    sigp->signhash16[1] = h[1];
++
++    /* XXX pgpImplVec forces "--usecrypto foo" to also be used */
++    xx = pgpImplSign(dig);
++assert(xx == 1);
++
++    be += 2;				/* skip unhashed length. */
++    h = be;
++
++    *be++ = 1 + 8;			/* issuer key ID */
++    *be++ = PGPSUBTYPE_ISSUER_KEYID;
++    *be++ = pubp->signid[0];
++    *be++ = pubp->signid[1];
++    *be++ = pubp->signid[2];
++    *be++ = pubp->signid[3];
++    *be++ = pubp->signid[4];
++    *be++ = pubp->signid[5];
++    *be++ = pubp->signid[6];
++    *be++ = pubp->signid[7];
++
++    bt = (be - h);			/* set unhashed length */
++    h[-2] = (bt >> 8);
++    h[-1] = (bt     );
++
++    *be++ = sigp->signhash16[0];	/* signhash16 */
++    *be++ = sigp->signhash16[1];
++
++assert(gc->sig);
++xx = gcry_sexp_extract_param (gc->sig, NULL, "r s", &gc->r, &gc->s, NULL);
++assert(gc->r);
++assert(gc->s);
++    bn = gcry_mpi_get_nbits(gc->r);
++    bn += 7;	bn &= ~7;
++    *be++ = (bn >> 8);
++    *be++ = (bn     );
++    xx = gcry_mpi_print(GCRYMPI_FMT_USG, be, bn/8, NULL, gc->r);
++    be += bn/8;
++
++    bn = gcry_mpi_get_nbits(gc->s);
++    bn += 7;	bn &= ~7;
++    *be++ = (bn >> 8);
++    *be++ = (bn     );
++    xx = gcry_mpi_print(GCRYMPI_FMT_USG, be, bn/8, NULL, gc->s);
++    be += bn/8;
++
++    pktlen = (be - pkt);		/* packet length */
++    bn = pktlen - 3;
++    pkt[1] = (bn >> 8);
++    pkt[2] = (bn     );
++
++    dig->sig = memcpy(xmalloc(pktlen), pkt, pktlen);
++    dig->siglen = pktlen;
++
++    return 0;
++
++}
+ 
++#endif	/* WITH_GCRYPT */
+diff --git a/rpmio/rpmgc.h b/rpmio/rpmgc.h
+index e6de92f..f366b84 100644
+--- a/rpmio/rpmgc.h
++++ b/rpmio/rpmgc.h
+@@ -72,4 +72,9 @@ struct rpmgc_s {
+ /*@unchecked@*/
+ extern pgpImplVecs_t rpmgcImplVecs;
+ 
++int rpmgcExportPubkey(pgpDig dig)
++	/*@*/;
++int rpmgcExportSignature(pgpDig dig, /*@only@*/ DIGEST_CTX ctx)
++	/*@*/;
++
+ #endif	/* H_RPMGC */
+diff --git a/rpmio/rpmltc.c b/rpmio/rpmltc.c
+index 8ba144c..24b39b5 100644
+--- a/rpmio/rpmltc.c
++++ b/rpmio/rpmltc.c
+@@ -1,4 +1,4 @@
+-/** \ingroup rpmpgp
++/** \grounding rpmpgp
+  * \file rpmio/rpmltc.c
+  */
+ 
+@@ -202,6 +202,9 @@ ltc->digestlen = 0;
+     if (ltc->hashIdx >= 0) {
+ 	/* Compare leading 16 bits of digest for quick check. */
+ 	rc = memcmp(ltc->digest, sigp->signhash16, sizeof(sigp->signhash16));
++    	/* XXX FIXME: avoid spurious "BAD" error msg while signing. */
++    	if (rc && sigp->signhash16[0] == 0 && sigp->signhash16[1] == 0)
++	    rc = 0;
+     }
+ 
+ SPEW(rc, !rc, dig);
+@@ -710,6 +713,7 @@ void rpmltcClean(void * impl)
+ 	ltc->digest = _free(ltc->digest);
+ 	ltc->digestlen = 0;
+ 
++	/* XXX rsa_free(&ltc->dsa); */
+ 	_freeBN(ltc->rsa.N);
+ 	_freeBN(ltc->rsa.e);
+ 	_freeBN(ltc->rsa.d);
+@@ -722,6 +726,7 @@ void rpmltcClean(void * impl)
+ 
+ 	_freeBN(ltc->c);
+ 
++	/* XXX dsa_free(&ltc->dsa); */
+ 	_freeBN(ltc->dsa.p);
+ 	_freeBN(ltc->dsa.q);
+ 	_freeBN(ltc->dsa.g);
+@@ -914,5 +919,195 @@ struct pgpImplVecs_s rpmltcImplVecs = {
+ 	rpmltcFree, rpmltcInit
+ };
+ 
+-#endif	/* WITH_TOMCRYPT */
++int rpmltcExportPubkey(pgpDig dig)
++{
++    uint8_t pkt[8192];
++    uint8_t * be = pkt;
++    size_t pktlen;
++    time_t now = time(NULL);
++    uint32_t bt = now;
++    uint16_t bn;
++    pgpDigParams pubp = pgpGetPubkey(dig);
++    rpmltc ltc = (rpmltc) dig->impl;
++    int xx;
++
++    *be++ = 0x80 | (PGPTAG_PUBLIC_KEY << 2) | 0x01;
++    be += 2;
++
++    *be++ = 0x04;
++    *be++ = (bt >> 24);
++    *be++ = (bt >> 16);
++    *be++ = (bt >>  8);
++    *be++ = (bt      );
++    *be++ = pubp->pubkey_algo;
++
++    bn = mp_count_bits(ltc->dsa.p);
++    bn += 7; bn &= ~7;
++    *be++ = (bn >> 8);	*be++ = (bn     );
++    xx = mp_to_unsigned_bin(ltc->dsa.p, be);
++    be += bn/8;
++
++    bn = mp_count_bits(ltc->dsa.q);
++    bn += 7; bn &= ~7;
++    *be++ = (bn >> 8);	*be++ = (bn     );
++    xx = mp_to_unsigned_bin(ltc->dsa.q, be);
++    be += bn/8;
++
++    bn = mp_count_bits(ltc->dsa.g);
++    bn += 7; bn &= ~7;
++    *be++ = (bn >> 8);	*be++ = (bn     );
++    xx = mp_to_unsigned_bin(ltc->dsa.g, be);
++    be += bn/8;
++
++    bn = mp_count_bits(ltc->dsa.y);
++    bn += 7; bn &= ~7;
++    *be++ = (bn >> 8);	*be++ = (bn     );
++    xx = mp_to_unsigned_bin(ltc->dsa.y, be);
++    be += bn/8;
++
++    pktlen = (be - pkt);
++    bn = pktlen - 3;
++    pkt[1] = (bn >> 8);
++    pkt[2] = (bn     );
++
++    xx = pgpPubkeyFingerprint(pkt, pktlen, pubp->signid);
++
++    dig->pub = memcpy(xmalloc(pktlen), pkt, pktlen);
++    dig->publen = pktlen;
++
++    return 0;
++}
++
++int rpmltcExportSignature(pgpDig dig, /*@only@*/ DIGEST_CTX ctx)
++{
++    uint8_t pkt[8192];
++    uint8_t * be = pkt;
++    uint8_t * h;
++    size_t pktlen;
++    time_t now = time(NULL);
++    uint32_t bt;
++    uint16_t bn;
++    pgpDigParams pubp = pgpGetPubkey(dig);
++    pgpDigParams sigp = pgpGetSignature(dig);
++    rpmltc ltc = (rpmltc) dig->impl;
++    int xx;
++
++    sigp->tag = PGPTAG_SIGNATURE;
++    *be++ = 0x80 | (sigp->tag << 2) | 0x01;
++    be += 2;				/* pktlen */
++
++    sigp->hash = be;
++    *be++ = sigp->version = 0x04;		/* version */
++    *be++ = sigp->sigtype = PGPSIGTYPE_BINARY;	/* sigtype */
++    *be++ = sigp->pubkey_algo = pubp->pubkey_algo;	/* pubkey_algo */
++    *be++ = sigp->hash_algo;		/* hash_algo */
++
++    be += 2;				/* skip hashd length */
++    h = (uint8_t *) be;
++
++    *be++ = 1 + 4;			/* signature creation time */
++    *be++ = PGPSUBTYPE_SIG_CREATE_TIME;
++    bt = now;
++    *be++ = sigp->time[0] = (bt >> 24);
++    *be++ = sigp->time[1] = (bt >> 16);
++    *be++ = sigp->time[2] = (bt >>  8);
++    *be++ = sigp->time[3] = (bt      );
++
++    *be++ = 1 + 4;			/* signature expiration time */
++    *be++ = PGPSUBTYPE_SIG_EXPIRE_TIME;
++    bt = 30 * 24 * 60 * 60;		/* XXX 30 days from creation */
++    *be++ = sigp->expire[0] = (bt >> 24);
++    *be++ = sigp->expire[1] = (bt >> 16);
++    *be++ = sigp->expire[2] = (bt >>  8);
++    *be++ = sigp->expire[3] = (bt      );
++
++/* key expiration time (only on a self-signature) */
++
++    *be++ = 1 + 1;			/* exportable certification */
++    *be++ = PGPSUBTYPE_EXPORTABLE_CERT;
++    *be++ = 0;
++
++    *be++ = 1 + 1;			/* revocable */
++    *be++ = PGPSUBTYPE_REVOCABLE;
++    *be++ = 0;
++
++/* notation data */
++
++    sigp->hashlen = (be - h);		/* set hashed length */
++    h[-2] = (sigp->hashlen >> 8);
++    h[-1] = (sigp->hashlen     );
++    sigp->hashlen += sizeof(struct pgpPktSigV4_s);
++
++    if (sigp->hash != NULL)
++	xx = rpmDigestUpdate(ctx, sigp->hash, sigp->hashlen);
++
++    if (sigp->version == (rpmuint8_t) 4) {
++	uint8_t trailer[6];
++	trailer[0] = sigp->version;
++	trailer[1] = (rpmuint8_t)0xff;
++	trailer[2] = (sigp->hashlen >> 24);
++	trailer[3] = (sigp->hashlen >> 16);
++	trailer[4] = (sigp->hashlen >>  8);
++	trailer[5] = (sigp->hashlen      );
++	xx = rpmDigestUpdate(ctx, trailer, sizeof(trailer));
++    }
++
++    sigp->signhash16[0] = 0x00;
++    sigp->signhash16[1] = 0x00;
++    xx = pgpImplSetDSA(ctx, dig, sigp);	/* XXX signhash16 check always fails */
++    h = (uint8_t *) ltc->digest;
++    sigp->signhash16[0] = h[0];
++    sigp->signhash16[1] = h[1];
++
++    /* XXX pgpImplVec forces "--usecrypto foo" to also be used */
++    xx = pgpImplSign(dig);
++assert(xx == 1);
++
++    be += 2;				/* skip unhashed length. */
++    h = be;
++
++    *be++ = 1 + 8;			/* issuer key ID */
++    *be++ = PGPSUBTYPE_ISSUER_KEYID;
++    *be++ = pubp->signid[0];
++    *be++ = pubp->signid[1];
++    *be++ = pubp->signid[2];
++    *be++ = pubp->signid[3];
++    *be++ = pubp->signid[4];
++    *be++ = pubp->signid[5];
++    *be++ = pubp->signid[6];
++    *be++ = pubp->signid[7];
++
++    bt = (be - h);			/* set unhashed length */
++    h[-2] = (bt >> 8);
++    h[-1] = (bt     );
++
++    *be++ = sigp->signhash16[0];	/* signhash16 */
++    *be++ = sigp->signhash16[1];
++
++    bn = mp_count_bits(ltc->r);
++    bn += 7;	bn &= ~7;
++    *be++ = (bn >> 8);
++    *be++ = (bn     );
++    xx = mp_to_unsigned_bin(ltc->r, be);
++    be += bn/8;
++
++    bn = mp_count_bits(ltc->s);
++    bn += 7;	bn &= ~7;
++    *be++ = (bn >> 8);
++    *be++ = (bn     );
++    xx = mp_to_unsigned_bin(ltc->s, be);
++    be += bn/8;
++
++    pktlen = (be - pkt);		/* packet length */
++    bn = pktlen - 3;
++    pkt[1] = (bn >> 8);
++    pkt[2] = (bn     );
++
++    dig->sig = memcpy(xmalloc(pktlen), pkt, pktlen);
++    dig->siglen = pktlen;
++
++    return 0;
+ 
++}
++
++#endif	/* WITH_TOMCRYPT */
+diff --git a/rpmio/rpmltc.h b/rpmio/rpmltc.h
+index 9b49e60..2708289 100644
+--- a/rpmio/rpmltc.h
++++ b/rpmio/rpmltc.h
+@@ -56,4 +56,9 @@ struct rpmltc_s {
+ /*@unchecked@*/
+ extern pgpImplVecs_t rpmltcImplVecs;
+ 
++int rpmltcExportPubkey(pgpDig dig)
++	/*@*/;
++int rpmltcExportSignature(pgpDig dig, /*@only@*/ DIGEST_CTX ctx)
++	/*@*/;
++
+ #endif	/* H_RPMLTC */
+diff --git a/rpmio/rpmnss.c b/rpmio/rpmnss.c
+index 26e9b67..d350193 100644
+--- a/rpmio/rpmnss.c
++++ b/rpmio/rpmnss.c
+@@ -626,6 +626,10 @@ fprintf(stderr, "*** %s/%s hashAlg %d\n", dig->pubkey_algoN, dig->hash_algoN, (u
+     /* Compare leading 16 bits of digest for quick check. */
+     rc = memcmp(nss->digest, sigp->signhash16, sizeof(sigp->signhash16));
+ 
++    /* XXX FIXME: avoid spurious "BAD" error msg while signing. */
++    if (rc && sigp->signhash16[0] == 0 && sigp->signhash16[1] == 0)
++	rc = 0;
++
+ exit:
+ SPEW(rc, !rc, dig);
+     return rc;
+@@ -1466,5 +1470,202 @@ struct pgpImplVecs_s rpmnssImplVecs = {
+ 	rpmnssFree, rpmnssInit
+ };
+ 
+-#endif	/* WITH_NSS */
++int rpmnssExportPubkey(pgpDig dig)
++{
++    uint8_t pkt[8192];
++    uint8_t * be = pkt;
++    size_t pktlen;
++    time_t now = time(NULL);
++    uint32_t bt = now;
++    uint16_t bn;
++    pgpDigParams pubp = pgpGetPubkey(dig);
++    rpmnss nss = (rpmnss) dig->impl;
++    int xx;
++
++    *be++ = 0x80 | (PGPTAG_PUBLIC_KEY << 2) | 0x01;
++    be += 2;
++
++    *be++ = 0x04;
++    *be++ = (bt >> 24);
++    *be++ = (bt >> 16);
++    *be++ = (bt >>  8);
++    *be++ = (bt      );
++    *be++ = pubp->pubkey_algo;
++
++    /* DSA p */
++    bn = 8 * nss->pub_key->u.dsa.params.prime.len;
++    bn += 7; bn &= ~7;
++    *be++ = (bn >> 8);	*be++ = (bn     );
++    memcpy(be, nss->pub_key->u.dsa.params.prime.data, bn/8);
++    be += bn/8;
++
++    /* DSA q */
++    bn = 8 * nss->pub_key->u.dsa.params.subPrime.len;
++    bn += 7; bn &= ~7;
++    *be++ = (bn >> 8);	*be++ = (bn     );
++    memcpy(be, nss->pub_key->u.dsa.params.subPrime.data, bn/8);
++    be += bn/8;
++
++    /* DSA g */
++    bn = 8 * nss->pub_key->u.dsa.params.base.len;
++    bn += 7; bn &= ~7;
++    *be++ = (bn >> 8);	*be++ = (bn     );
++    memcpy(be, nss->pub_key->u.dsa.params.base.data, bn/8);
++    be += bn/8;
++
++    bn = 8 * nss->pub_key->u.dsa.publicValue.len;
++    bn += 7; bn &= ~7;
++    *be++ = (bn >> 8);	*be++ = (bn     );
++    memcpy(be, nss->pub_key->u.dsa.publicValue.data, bn/8);
++    be += bn/8;
++
++    pktlen = (be - pkt);
++    bn = pktlen - 3;
++    pkt[1] = (bn >> 8);
++    pkt[2] = (bn     );
++
++    xx = pgpPubkeyFingerprint(pkt, pktlen, pubp->signid);
++
++    dig->pub = memcpy(xmalloc(pktlen), pkt, pktlen);
++    dig->publen = pktlen;
++
++    return 0;
++}
++
++int rpmnssExportSignature(pgpDig dig, /*@only@*/ DIGEST_CTX ctx)
++{
++    uint8_t pkt[8192];
++    uint8_t * be = pkt;
++    uint8_t * h;
++    size_t pktlen;
++    time_t now = time(NULL);
++    uint32_t bt;
++    uint16_t bn;
++    pgpDigParams pubp = pgpGetPubkey(dig);
++    pgpDigParams sigp = pgpGetSignature(dig);
++    rpmnss nss = (rpmnss) dig->impl;
++    int xx;
++
++    sigp->tag = PGPTAG_SIGNATURE;
++    *be++ = 0x80 | (sigp->tag << 2) | 0x01;
++    be += 2;				/* pktlen */
++
++    sigp->hash = be;
++    *be++ = sigp->version = 0x04;		/* version */
++    *be++ = sigp->sigtype = PGPSIGTYPE_BINARY;	/* sigtype */
++    *be++ = sigp->pubkey_algo = pubp->pubkey_algo;	/* pubkey_algo */
++    *be++ = sigp->hash_algo;		/* hash_algo */
++
++    be += 2;				/* skip hashd length */
++    h = (uint8_t *) be;
++
++    *be++ = 1 + 4;			/* signature creation time */
++    *be++ = PGPSUBTYPE_SIG_CREATE_TIME;
++    bt = now;
++    *be++ = sigp->time[0] = (bt >> 24);
++    *be++ = sigp->time[1] = (bt >> 16);
++    *be++ = sigp->time[2] = (bt >>  8);
++    *be++ = sigp->time[3] = (bt      );
++
++    *be++ = 1 + 4;			/* signature expiration time */
++    *be++ = PGPSUBTYPE_SIG_EXPIRE_TIME;
++    bt = 30 * 24 * 60 * 60;		/* XXX 30 days from creation */
++    *be++ = sigp->expire[0] = (bt >> 24);
++    *be++ = sigp->expire[1] = (bt >> 16);
++    *be++ = sigp->expire[2] = (bt >>  8);
++    *be++ = sigp->expire[3] = (bt      );
++
++/* key expiration time (only on a self-signature) */
++
++    *be++ = 1 + 1;			/* exportable certification */
++    *be++ = PGPSUBTYPE_EXPORTABLE_CERT;
++    *be++ = 0;
++
++    *be++ = 1 + 1;			/* revocable */
++    *be++ = PGPSUBTYPE_REVOCABLE;
++    *be++ = 0;
++
++/* notation data */
++
++    sigp->hashlen = (be - h);		/* set hashed length */
++    h[-2] = (sigp->hashlen >> 8);
++    h[-1] = (sigp->hashlen     );
++    sigp->hashlen += sizeof(struct pgpPktSigV4_s);
++
++    if (sigp->hash != NULL)
++	xx = rpmDigestUpdate(ctx, sigp->hash, sigp->hashlen);
++
++    if (sigp->version == (rpmuint8_t) 4) {
++	uint8_t trailer[6];
++	trailer[0] = sigp->version;
++	trailer[1] = (rpmuint8_t)0xff;
++	trailer[2] = (sigp->hashlen >> 24);
++	trailer[3] = (sigp->hashlen >> 16);
++	trailer[4] = (sigp->hashlen >>  8);
++	trailer[5] = (sigp->hashlen      );
++	xx = rpmDigestUpdate(ctx, trailer, sizeof(trailer));
++    }
++
++    sigp->signhash16[0] = 0x00;
++    sigp->signhash16[1] = 0x00;
++    xx = pgpImplSetDSA(ctx, dig, sigp);	/* XXX signhash16 check always fails */
++    h = (uint8_t *) nss->digest;
++    sigp->signhash16[0] = h[0];
++    sigp->signhash16[1] = h[1];
++
++    /* XXX pgpImplVec forces "--usecrypto foo" to also be used */
++    xx = pgpImplSign(dig);
++assert(xx == 1);
++
++    be += 2;				/* skip unhashed length. */
++    h = be;
++
++    *be++ = 1 + 8;			/* issuer key ID */
++    *be++ = PGPSUBTYPE_ISSUER_KEYID;
++    *be++ = pubp->signid[0];
++    *be++ = pubp->signid[1];
++    *be++ = pubp->signid[2];
++    *be++ = pubp->signid[3];
++    *be++ = pubp->signid[4];
++    *be++ = pubp->signid[5];
++    *be++ = pubp->signid[6];
++    *be++ = pubp->signid[7];
++
++    bt = (be - h);			/* set unhashed length */
++    h[-2] = (bt >> 8);
++    h[-1] = (bt     );
++
++    *be++ = sigp->signhash16[0];	/* signhash16 */
++    *be++ = sigp->signhash16[1];
++
++  { SECItem * dsasig = DSAU_DecodeDerSig(nss->sig);
++assert(dsasig != NULL);
++    bn = 8 * (dsasig->len/2);
++    bn += 7;	bn &= ~7;
++    *be++ = (bn >> 8);
++    *be++ = (bn     );
++    memcpy(be, dsasig->data, bn/8);
++    be += bn/8;
++
++    bn = 8 * (dsasig->len/2);
++    bn += 7;	bn &= ~7;
++    *be++ = (bn >> 8);
++    *be++ = (bn     );
++    memcpy(be, dsasig->data + (bn/8), bn/8);
++    be += bn/8;
++    SECITEM_ZfreeItem(dsasig, PR_TRUE);
++  }
++
++    pktlen = (be - pkt);		/* packet length */
++    bn = pktlen - 3;
++    pkt[1] = (bn >> 8);
++    pkt[2] = (bn     );
+ 
++    dig->sig = memcpy(xmalloc(pktlen), pkt, pktlen);
++    dig->siglen = pktlen;
++
++    return 0;
++
++}
++
++#endif	/* WITH_NSS */
+diff --git a/rpmio/rpmnss.h b/rpmio/rpmnss.h
+index aef88ec..007a4d2 100644
+--- a/rpmio/rpmnss.h
++++ b/rpmio/rpmnss.h
+@@ -69,4 +69,9 @@ SECOidTag curveOid;
+ /*@unchecked@*/
+ extern pgpImplVecs_t rpmnssImplVecs;
+ 
++int rpmnssExportPubkey(pgpDig dig)
++	/*@*/;
++int rpmnssExportSignature(pgpDig dig, /*@only@*/ DIGEST_CTX ctx)
++	/*@*/;
++
+ #endif	/* H_RPMNSS */
+diff --git a/rpmio/rpmpgp.c b/rpmio/rpmpgp.c
+index ac08a24..bc3ce1e 100644
+--- a/rpmio/rpmpgp.c
++++ b/rpmio/rpmpgp.c
+@@ -12,9 +12,21 @@
+ 
+ #define	_RPMPGP_INTERNAL
+ #include <rpmbc.h>	/* XXX still needs base64 goop */
++#if defined(WITH_GCRYPT)
++#include <rpmgc.h>
++#endif
+ #if defined(WITH_NSS)
+ #include <rpmnss.h>
+ #endif
++#if defined(WITH_OPENSSL)
++#include <rpmssl.h>
++#endif
++#if defined(WITH_CDSA)
++#include <rpmcdsa.h>
++#endif
++#if defined(WITH_TOMCRYPT)
++#include <rpmltc.h>
++#endif
+ #include "debug.h"
+ 
+ /*@access pgpDig @*/
+@@ -1216,13 +1228,45 @@ pgpDig pgpDigNew(pgpVSFlags vsflags, pgpPubkeyAlgo pubkey_algo)
+     if (pubp->pubkey_algo) {
+ 	int xx = pgpImplGenerate(dig);
+ assert(xx == 1);
+-	/* XXX FIXME: limited to DSA from BeeCrypt for now. */
+-	if (pgpImplVecs == &rpmbcImplVecs)
+-	    xx = rpmbcExportPubkey(dig);
++	xx = pgpExportPubkey(dig);
+     }
+     return dig;
+ }
+ 
++int pgpExportPubkey(pgpDig dig)
++{
++    int xx = 0;	/* XXX FIXME */
++    /* XXX FIXME: limited to DSA for now. */
++    if (pgpImplVecs == &rpmbcImplVecs)
++	xx = rpmbcExportPubkey(dig);
++    if (pgpImplVecs == &rpmsslImplVecs)
++	xx = rpmsslExportPubkey(dig);
++    if (pgpImplVecs == &rpmnssImplVecs)
++	xx = rpmnssExportPubkey(dig);
++    if (pgpImplVecs == &rpmgcImplVecs)
++	xx = rpmgcExportPubkey(dig);
++    if (pgpImplVecs == &rpmltcImplVecs)
++	xx = rpmltcExportPubkey(dig);
++    return xx;
++}
++
++int pgpExportSignature(pgpDig dig, DIGEST_CTX ctx)
++{
++    int xx = 0;	/* XXX FIXME */
++    /* XXX FIXME: limited to DSA for now. */
++    if (pgpImplVecs == &rpmbcImplVecs)
++	xx = rpmbcExportSignature(dig, ctx);
++    if (pgpImplVecs == &rpmsslImplVecs)
++	xx = rpmsslExportSignature(dig, ctx);
++    if (pgpImplVecs == &rpmnssImplVecs)
++	xx = rpmnssExportSignature(dig, ctx);
++    if (pgpImplVecs == &rpmgcImplVecs)
++	xx = rpmgcExportSignature(dig, ctx);
++    if (pgpImplVecs == &rpmltcImplVecs)
++	xx = rpmltcExportSignature(dig, ctx);
++    return xx;
++}
++
+ pgpDigParams pgpGetSignature(pgpDig dig)
+ {
+     return (dig ? &dig->signature : NULL);
+diff --git a/rpmio/rpmpgp.h b/rpmio/rpmpgp.h
+index a908cc3..1e7b5f8 100644
+--- a/rpmio/rpmpgp.h
++++ b/rpmio/rpmpgp.h
+@@ -1434,10 +1434,6 @@ pgpDig pgpDigFree(/*@killref@*/ /*@only@*/ /*@null@*/ pgpDig dig)
+ pgpDig pgpDigNew(pgpVSFlags vsflags, pgpPubkeyAlgo pubkey_algo)
+ 	/*@globals fileSystem @*/
+ 	/*@modifies fileSystem @*/;
+-int rpmbcExportPubkey(pgpDig dig)
+-	/*@*/;
+-int rpmbcExportSignature(pgpDig dig, /*@only@*/ DIGEST_CTX ctx)
+-	/*@*/;
+ 
+ /** \ingroup rpmpgp
+  * Release (malloc'd) data from container.
+@@ -1446,6 +1442,11 @@ int rpmbcExportSignature(pgpDig dig, /*@only@*/ DIGEST_CTX ctx)
+ void pgpDigClean(/*@null@*/ pgpDig dig)
+ 	/*@modifies dig @*/;
+ 
++int pgpExportPubkey(pgpDig dig)
++	/*@*/;
++int pgpExportSignature(pgpDig dig, /*@only@*/ DIGEST_CTX ctx)
++	/*@*/;
++
+ /** \ingroup rpmpgp
+  * Return OpenPGP pubkey parameters.
+  * @param dig		signature parameters container
+diff --git a/rpmio/rpmssl.c b/rpmio/rpmssl.c
+index 27ae167..13bdb35 100644
+--- a/rpmio/rpmssl.c
++++ b/rpmio/rpmssl.c
+@@ -33,7 +33,7 @@ extern int _pgp_print;
+ /*@=redecl@*/
+ 
+ /*@unchecked@*/
+-static int _rpmssl_debug;
++static int _rpmssl_debug = -1;
+ 
+ #define	SPEW(_t, _rc, _dig)	\
+   { if ((_t) || _rpmssl_debug || _pgp_debug < 0) \
+@@ -735,5 +735,195 @@ struct pgpImplVecs_s rpmsslImplVecs = {
+ 	rpmsslFree, rpmsslInit
+ };
+ 
+-#endif
++int rpmsslExportPubkey(pgpDig dig)
++{
++    uint8_t pkt[8192];
++    uint8_t * be = pkt;
++    size_t pktlen;
++    time_t now = time(NULL);
++    uint32_t bt = now;
++    uint16_t bn;
++    pgpDigParams pubp = pgpGetPubkey(dig);
++    rpmssl ssl = (rpmssl) dig->impl;
++    int xx;
++
++    *be++ = 0x80 | (PGPTAG_PUBLIC_KEY << 2) | 0x01;
++    be += 2;
++
++    *be++ = 0x04;
++    *be++ = (bt >> 24);
++    *be++ = (bt >> 16);
++    *be++ = (bt >>  8);
++    *be++ = (bt      );
++    *be++ = pubp->pubkey_algo;
++
++    bn = BN_num_bits(ssl->dsa->p);
++    bn += 7; bn &= ~7;
++    *be++ = (bn >> 8);	*be++ = (bn     );
++    xx = BN_bn2bin(ssl->dsa->p, be);
++    be += bn/8;
++
++    bn = BN_num_bits(ssl->dsa->q);
++    bn += 7; bn &= ~7;
++    *be++ = (bn >> 8);	*be++ = (bn     );
++    xx = BN_bn2bin(ssl->dsa->q, be);
++    be += bn/8;
++
++    bn = BN_num_bits(ssl->dsa->g);
++    bn += 7; bn &= ~7;
++    *be++ = (bn >> 8);	*be++ = (bn     );
++    xx = BN_bn2bin(ssl->dsa->g, be);
++    be += bn/8;
++
++    bn = BN_num_bits(ssl->dsa->pub_key);
++    bn += 7; bn &= ~7;
++    *be++ = (bn >> 8);	*be++ = (bn     );
++    xx = BN_bn2bin(ssl->dsa->pub_key, be);
++    be += bn/8;
++
++    pktlen = (be - pkt);
++    bn = pktlen - 3;
++    pkt[1] = (bn >> 8);
++    pkt[2] = (bn     );
++
++    xx = pgpPubkeyFingerprint(pkt, pktlen, pubp->signid);
++
++    dig->pub = memcpy(xmalloc(pktlen), pkt, pktlen);
++    dig->publen = pktlen;
++
++    return 0;
++}
++
++int rpmsslExportSignature(pgpDig dig, /*@only@*/ DIGEST_CTX ctx)
++{
++    uint8_t pkt[8192];
++    uint8_t * be = pkt;
++    uint8_t * h;
++    size_t pktlen;
++    time_t now = time(NULL);
++    uint32_t bt;
++    uint16_t bn;
++    pgpDigParams pubp = pgpGetPubkey(dig);
++    pgpDigParams sigp = pgpGetSignature(dig);
++    rpmssl ssl = (rpmssl) dig->impl;
++    int xx;
++
++    sigp->tag = PGPTAG_SIGNATURE;
++    *be++ = 0x80 | (sigp->tag << 2) | 0x01;
++    be += 2;				/* pktlen */
++
++    sigp->hash = be;
++    *be++ = sigp->version = 0x04;		/* version */
++    *be++ = sigp->sigtype = PGPSIGTYPE_BINARY;	/* sigtype */
++    *be++ = sigp->pubkey_algo = pubp->pubkey_algo;	/* pubkey_algo */
++    *be++ = sigp->hash_algo;		/* hash_algo */
++
++    be += 2;				/* skip hashd length */
++    h = (uint8_t *) be;
++
++    *be++ = 1 + 4;			/* signature creation time */
++    *be++ = PGPSUBTYPE_SIG_CREATE_TIME;
++    bt = now;
++    *be++ = sigp->time[0] = (bt >> 24);
++    *be++ = sigp->time[1] = (bt >> 16);
++    *be++ = sigp->time[2] = (bt >>  8);
++    *be++ = sigp->time[3] = (bt      );
++
++    *be++ = 1 + 4;			/* signature expiration time */
++    *be++ = PGPSUBTYPE_SIG_EXPIRE_TIME;
++    bt = 30 * 24 * 60 * 60;		/* XXX 30 days from creation */
++    *be++ = sigp->expire[0] = (bt >> 24);
++    *be++ = sigp->expire[1] = (bt >> 16);
++    *be++ = sigp->expire[2] = (bt >>  8);
++    *be++ = sigp->expire[3] = (bt      );
++
++/* key expiration time (only on a self-signature) */
++
++    *be++ = 1 + 1;			/* exportable certification */
++    *be++ = PGPSUBTYPE_EXPORTABLE_CERT;
++    *be++ = 0;
++
++    *be++ = 1 + 1;			/* revocable */
++    *be++ = PGPSUBTYPE_REVOCABLE;
++    *be++ = 0;
++
++/* notation data */
++
++    sigp->hashlen = (be - h);		/* set hashed length */
++    h[-2] = (sigp->hashlen >> 8);
++    h[-1] = (sigp->hashlen     );
++    sigp->hashlen += sizeof(struct pgpPktSigV4_s);
++
++    if (sigp->hash != NULL)
++	xx = rpmDigestUpdate(ctx, sigp->hash, sigp->hashlen);
++
++    if (sigp->version == (rpmuint8_t) 4) {
++	uint8_t trailer[6];
++	trailer[0] = sigp->version;
++	trailer[1] = (rpmuint8_t)0xff;
++	trailer[2] = (sigp->hashlen >> 24);
++	trailer[3] = (sigp->hashlen >> 16);
++	trailer[4] = (sigp->hashlen >>  8);
++	trailer[5] = (sigp->hashlen      );
++	xx = rpmDigestUpdate(ctx, trailer, sizeof(trailer));
++    }
++
++    sigp->signhash16[0] = 0x00;
++    sigp->signhash16[1] = 0x00;
++    xx = pgpImplSetDSA(ctx, dig, sigp);	/* XXX signhash16 check always fails */
++    h = (uint8_t *) ssl->digest;
++    sigp->signhash16[0] = h[0];
++    sigp->signhash16[1] = h[1];
++
++    /* XXX pgpImplVec forces "--usecrypto foo" to also be used */
++    xx = pgpImplSign(dig);
++assert(xx == 1);
++
++    be += 2;				/* skip unhashed length. */
++    h = be;
++
++    *be++ = 1 + 8;			/* issuer key ID */
++    *be++ = PGPSUBTYPE_ISSUER_KEYID;
++    *be++ = pubp->signid[0];
++    *be++ = pubp->signid[1];
++    *be++ = pubp->signid[2];
++    *be++ = pubp->signid[3];
++    *be++ = pubp->signid[4];
++    *be++ = pubp->signid[5];
++    *be++ = pubp->signid[6];
++    *be++ = pubp->signid[7];
++
++    bt = (be - h);			/* set unhashed length */
++    h[-2] = (bt >> 8);
++    h[-1] = (bt     );
++
++    *be++ = sigp->signhash16[0];	/* signhash16 */
++    *be++ = sigp->signhash16[1];
++
++    bn = BN_num_bits(ssl->dsasig->r);
++    bn += 7;	bn &= ~7;
++    *be++ = (bn >> 8);
++    *be++ = (bn     );
++    xx = BN_bn2bin(ssl->dsasig->r, be);
++    be += bn/8;
++
++    bn = BN_num_bits(ssl->dsasig->s);
++    bn += 7;	bn &= ~7;
++    *be++ = (bn >> 8);
++    *be++ = (bn     );
++    xx = BN_bn2bin(ssl->dsasig->s, be);
++    be += bn/8;
++
++    pktlen = (be - pkt);		/* packet length */
++    bn = pktlen - 3;
++    pkt[1] = (bn >> 8);
++    pkt[2] = (bn     );
++
++    dig->sig = memcpy(xmalloc(pktlen), pkt, pktlen);
++    dig->siglen = pktlen;
++
++    return 0;
++
++}
+ 
++#endif	/* WITH_SSL */
+diff --git a/rpmio/rpmssl.h b/rpmio/rpmssl.h
+index 00a17c6..41509cb 100644
+--- a/rpmio/rpmssl.h
++++ b/rpmio/rpmssl.h
+@@ -72,4 +72,9 @@ struct rpmssl_s {
+ /*@unchecked@*/
+ extern pgpImplVecs_t rpmsslImplVecs;
+ 
++int rpmsslExportPubkey(pgpDig dig)
++	/*@*/;
++int rpmsslExportSignature(pgpDig dig, /*@only@*/ DIGEST_CTX ctx)
++	/*@*/;
++
+ #endif	/* H_RPMSSL */
+-- 
+2.0.1
+

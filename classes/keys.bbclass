@@ -27,13 +27,14 @@ create_rpm_user_keys() {
     local deploy_dir="${DEPLOY_DIR_IMAGE}/user-keys/rpm_keys"
     user_gpg_name="${RPM_GPG_NAME}"
     user_privkey_file="$deploy_dir/RPM-GPG-PRIVKEY-${user_gpg_name}"
+    user_pubkey_file="$deploy_dir/RPM-GPG-KEY-${user_gpg_name}"
 
     install -d "$deploy_dir"
     tmpdir=`mktemp -d`
 
 cat >$tmpdir/foo <<EOF
 %echo Generating a standard key
-Key-Type: DSA
+Key-Type: RSA
 Key-Length: 1024
 Subkey-Type: ELG-E
 Subkey-Length: 1024
@@ -42,7 +43,7 @@ Name-Comment: with empty passphrase
 Name-Email: ${user_gpg_name}@foo.com
 Expire-Date: 0
 %secring ${user_privkey_file}
-%pubring /dev/null
+%pubring ${user_pubkey_file}
 # Do a commit here, so that we can later print "done" :-)
 %commit
 %echo done
