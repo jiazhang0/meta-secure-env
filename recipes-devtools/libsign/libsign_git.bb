@@ -23,6 +23,7 @@ PV = "0.3.1+git${SRCPV}"
 
 DEPENDS += "openssl"
 RDEPENDS_${PN}_class-target += "libcrypto"
+RDEPENDS_${PN}_class-native += "openssl"
 
 PARALLEL_MAKE = ""
 
