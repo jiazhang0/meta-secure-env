@@ -84,11 +84,11 @@ MSFT = "${@bb.utils.contains('DISTRO_FEATURES', 'msft', '1', '0', d)}"
 python do_prepare_signing_keys() {
     shim_prepare_sb_keys(d)
 
-    # Replace the vendor certificate with EV certificate for speeding up
+    # Replace the shim certificate with EV certificate for speeding up
     # the progress of MSFT signing.
     if "${MSFT}" == "1" and uks_signing_model(d) == "sample":
         import shutil
-        shutil.copyfile('${EV_CERT}', '${WORKDIR}/vendor_cert.cer')
+        shutil.copyfile('${EV_CERT}', '${WORKDIR}/shim_cert.cer')
 }
 addtask prepare_signing_keys after do_check_user_keys before do_compile
 
