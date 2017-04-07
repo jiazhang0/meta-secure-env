@@ -88,7 +88,7 @@ python do_prepare_signing_keys() {
     # the progress of MSFT signing.
     if "${MSFT}" == "1" and uks_signing_model(d) == "sample":
         import shutil
-        shutil.copyfile('${EV_CERT}', '${WORKDIR}/shim_cert.cer')
+        shutil.copyfile('${EV_CERT}', '${S}/shim.crt')
 }
 addtask prepare_signing_keys after do_check_user_keys before do_compile
 
