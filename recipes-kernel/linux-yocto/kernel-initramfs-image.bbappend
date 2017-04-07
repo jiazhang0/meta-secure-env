@@ -4,7 +4,8 @@
 
 inherit user-key-store deploy
 
-do_install[depends] += "${@'${INITRAMFS_IMAGE}:do_rootfs' if '${INITRAMFS_IMAGE}' else ''}"
+# Always fetch the latest initramfs image
+do_install[nostamp] = "1"
 
 fakeroot python do_sign() {
     initramfs = None
