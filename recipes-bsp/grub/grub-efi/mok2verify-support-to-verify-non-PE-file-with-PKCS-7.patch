@@ -8,9 +8,9 @@ MOK2 Verify Protocol is designed to verify non-PE file which cannot be
 verified by the MOK verify protocol supplied by shim loader, such as grub
 configuration, initrd, grub modules and so on.
 
-Each file needs to have a .p7a PKCS#7 signature for verification. For
+Each file needs to have a .p7b PKCS#7 signature for verification. For
 more details about signature format and singing tool, refer to
-https://github.com/jiazhang0/SELoader and  https://github.com/jiazhang0/libsign
+https://github.com/jiazhang0/SELoader and https://github.com/jiazhang0/libsign
 
 Signed-off-by: Lans Zhang <jia.zhang@windriver.com>
 ---
