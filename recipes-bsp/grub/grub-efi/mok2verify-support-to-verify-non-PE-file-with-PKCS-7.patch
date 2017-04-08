@@ -1,4 +1,4 @@
-From d3a26fe4abb56a4be9b937e3ccf95747a924bc5a Mon Sep 17 00:00:00 2001
+From 4c06bb11e50024131a55d70879e0cdb19d74db51 Mon Sep 17 00:00:00 2001
 From: Lans Zhang <jia.zhang@windriver.com>
 Date: Thu, 16 Mar 2017 14:49:41 +0800
 Subject: [PATCH] mok2verify: support to verify non-PE file with PKCS#7
@@ -16,10 +16,10 @@ Signed-off-by: Lans Zhang <jia.zhang@windriver.com>
 ---
  grub-core/Makefile.core.def    |   6 ++
  grub-core/lib/efi/mok2verify.c | 140 +++++++++++++++++++++++++++++++++++++++++
- grub-core/loader/i386/linux.c  |  72 +++++++++++++++++++++
+ grub-core/loader/i386/linux.c  |  75 ++++++++++++++++++++++
  grub-core/normal/main.c        |  14 +++++
  include/grub/efi/mok2verify.h  |  39 ++++++++++++
- 5 files changed, 271 insertions(+)
+ 5 files changed, 274 insertions(+)
  create mode 100644 grub-core/lib/efi/mok2verify.c
  create mode 100644 include/grub/efi/mok2verify.h
 
@@ -187,7 +187,7 @@ index 0000000..231d5a7
 +  return GRUB_ERR_NONE;
 +}
 diff --git a/grub-core/loader/i386/linux.c b/grub-core/loader/i386/linux.c
-index e2425c8..1f5d645 100644
+index e2425c8..f6a6ff0 100644
 --- a/grub-core/loader/i386/linux.c
 +++ b/grub-core/loader/i386/linux.c
 @@ -34,6 +34,9 @@
@@ -266,7 +266,7 @@ index e2425c8..1f5d645 100644
    file = grub_file_open (argv[0]);
    if (! file)
      goto fail;
-@@ -1132,6 +1187,23 @@ grub_cmd_initrd (grub_command_t cmd __attribute__ ((unused)),
+@@ -1132,6 +1187,26 @@ grub_cmd_initrd (grub_command_t cmd __attribute__ ((unused)),
  			argv[i]);
  	  goto fail;
  	}
@@ -275,8 +275,11 @@ index e2425c8..1f5d645 100644
 +      grub_dprintf ("linux", "Verifying initrd %s, addr=0x%lx, size=0x%lx\n",
 +		    argv[i], (unsigned long) ptr, (unsigned long) cursize);
 +
-+      //if (grub_verify_file_buffer (argv[i], ptr, cursize) == GRUB_ERR_NONE)
-+      if (grub_verify_file (argv[i]) == GRUB_ERR_NONE)
++      /*
++       * XXX: use grub_verify_file_buffer (argv[i], ptr, cursize) in future
++       */
++      err = grub_verify_file (argv[i]);
++      if (err == GRUB_ERR_NONE)
 +	{
 +	  grub_dprintf ("linux", "initrd %s verified\n", argv[i]);
 +	}
