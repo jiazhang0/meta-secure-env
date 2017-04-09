@@ -1,3 +1,7 @@
+#
+# Copyright (C) 2016-2017 Wind River Systems, Inc.
+#
+
 SUMMARY = "A tool used to create, persist, evict a passphrase \
 for full-disk-encryption with TPM 2.0"
 DESCRIPTION = " \
@@ -15,8 +19,8 @@ LIC_FILES_CHKSUM = "file://${S}/LICENSE;md5=35c0ab29d291dbbd14d66fd95521237f"
 SRC_URI = " \
     git://github.com/WindRiver-OpenSourceLabs/cryptfs-tpm2.git \
 "
-SRCREV = "${AUTOREV}"
-PV = "0.5.0+git${SRCPV}"
+SRCREV = "768c100b5ca7d5cc3a3c902ac01dfcf24c6efc8b"
+PV = "0.5.1+git${SRCPV}"
 
 DEPENDS += "tpm2.0-tss"
 RDEPENDS_${PN} += "libtss2 libtctisocket tpm2.0-tools"
