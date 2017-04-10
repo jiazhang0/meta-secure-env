@@ -111,3 +111,4 @@ addtask do_import_gpg_key before do_export_public_keys
 addtask do_import_rpm_key
 
 do_import_gpg_key[depends] += "gnupg-native:do_populate_sysroot"
+do_import_rpm_key[depends] += "rpm-native:do_populate_sysroot"
