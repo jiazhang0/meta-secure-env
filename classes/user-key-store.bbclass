@@ -128,8 +128,8 @@ def shim_prepare_sb_keys(d):
 def sel_sign(key, cert, input, d):
     import bb.process
 
-    print d.getVar('STAGING_LIBDIR_NATIVE', True)
-    cmd = (' '.join((d.getVar('STAGING_BINDIR_NATIVE', True) + '/selsign',
+    cmd = (' '.join(('LD_LIBRARY_PATH=' + d.getVar('STAGING_LIBDIR_NATIVE', True) +
+           ':$LD_LIBRARY_PATH', d.getVar('STAGING_BINDIR_NATIVE', True) + '/selsign',
            '--key', key, '--cert', cert, input)))
     vprint("Signing %s with the key %s ..." % (input, key), d)
     vprint("Running cmd: %s" % cmd, d)
