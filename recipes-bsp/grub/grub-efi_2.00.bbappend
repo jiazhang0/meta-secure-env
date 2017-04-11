@@ -37,11 +37,12 @@ CFLAGS_append = " -fno-toplevel-reorder"
 inherit user-key-store
 
 python __anonymous () {
-    if d.getVar('MOK_SB', True) != "1":
+    if d.getVar('UEFI_SB', True) != "1":
         return
 
-    # Override the default filename if mok-secure-boot enabled.
-    # grub-efi must be renamed as grub${arch}.efi for working with shim.
+    # Override the default filename if uefi-secure-boot enabled.
+    # grub-efi must be renamed as grub${arch}.efi for working with shim
+    # or SELoader.
     import re
 
     target = d.getVar('TARGET_ARCH', True)

@@ -55,9 +55,9 @@ EFI_TARGET = "/boot/efi/EFI/BOOT"
 FILES_${PN} += "${EFI_TARGET}"
 
 python do_sign() {
-    sb_sign('${B}/Src/Efi/SELoader.efi', '${B}/SELoader${EFI_ARCH}.efi.signed', d)
-    sb_sign('${B}/Bin/Hash2DxeCrypto.efi', '${B}/Hash2DxeCrypto.efi.signed', d)
-    sb_sign('${B}/Bin/Pkcs7VerifyDxe.efi', '${B}/Pkcs7VerifyDxe.efi.signed', d)
+    sb_sign('${B}/Src/Efi/SELoader.efi', '${B}/Src/Efi/SELoader.efi.signed', d)
+    sb_sign('${B}/Bin/Hash2DxeCrypto.efi', '${B}/Bin/Hash2DxeCrypto.efi.signed', d)
+    sb_sign('${B}/Bin/Pkcs7VerifyDxe.efi', '${B}/Bin/Pkcs7VerifyDxe.efi.signed', d)
 }
 addtask sign after do_compile before do_install
 
@@ -65,6 +65,13 @@ do_install() {
     install -d ${D}${EFI_TARGET}
 
     oe_runmake install EFI_DESTDIR=${D}${EFI_TARGET}
+
+    if [ x"${UEFI_SB}" = x"1" ]; then
+        if [ x"${MOK_SB}" != x"1" ]; then
+            mv ${D}${EFI_TARGET}/SELoader${EFI_ARCH}.efi \
+                ${D}${EFI_TARGET}/boot${EFI_ARCH}.efi
+        fi
+    fi
 }
 
 do_deploy() {
@@ -77,8 +84,16 @@ do_deploy() {
     install -m 0600 ${B}/Bin/Pkcs7VerifyDxe.efi ${DEPLOYDIR}/efi-unsigned/
 
     # Deploy the signed images
-    install -m 0600 ${B}/SELoader${EFI_ARCH}.efi.signed ${DEPLOYDIR}/SELoader${EFI_ARCH}.efi
-    install -m 0600 ${B}/Hash2DxeCrypto.efi.signed ${DEPLOYDIR}/Hash2DxeCrypto.efi
-    install -m 0600 ${B}/Pkcs7VerifyDxe.efi.signed ${DEPLOYDIR}/Pkcs7VerifyDxe.efi
+    if [ x"${UEFI_SB}" = x"1" -a x"${MOK_SB}" != x"1" ]; then
+        SEL_NAME=boot
+    else
+        SEL_NAME=SELoader
+    fi
+    install -m 0600 ${D}${EFI_TARGET}/${SEL_NAME}${EFI_ARCH}.efi \
+        ${DEPLOYDIR}/${SEL_NAME}${EFI_ARCH}.efi
+    install -m 0600 ${D}${EFI_TARGET}/Hash2DxeCrypto.efi \
+        ${DEPLOYDIR}/Hash2DxeCrypto.efi
+    install -m 0600 ${D}${EFI_TARGET}/Pkcs7VerifyDxe.efi \
+        ${DEPLOYDIR}/Pkcs7VerifyDxe.efi
 }
 addtask deploy after do_install before do_build

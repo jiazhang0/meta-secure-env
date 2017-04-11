@@ -14,7 +14,6 @@ ALLOW_EMPTY_${PN}-net = "1"
 pkgs = " \
     shim \
     mokutil \
-    SELoader \
     packagegroup-uefi-secure-boot \
 "
 
