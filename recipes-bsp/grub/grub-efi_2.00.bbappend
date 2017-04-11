@@ -101,7 +101,7 @@ do_install_append_class-target() {
     grub-editenv "${D}${EFI_BOOT_PATH}/grubenv" create
 }
 
-python do_sign_class-target() {
+fakeroot python do_sign_class-target() {
     _ = '${D}${EFI_BOOT_PATH}/${GRUB_IMAGE}'
     sb_sign(_, _, d)
 
