@@ -4,7 +4,7 @@
 
 KEY_SHOW_VERBOSE = "1"
 
-RPM = '${@bb.utils.contains("DISTRO_FEATURES", "sign_rpm", "1", "0", d)}'
+RPM = '${@bb.utils.contains("DISTRO_FEATURES", "rpm-signing", "1", "0", d)}'
 
 def vprint(str, d):
     if d.getVar('KEY_SHOW_VERBOSE', True) == '1':
