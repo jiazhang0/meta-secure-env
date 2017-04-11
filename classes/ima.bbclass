@@ -145,3 +145,5 @@ fi
         postinst = postinst + (d.getVar('pkg_postinst_%s' % pkg, True) or '')
         d.setVar('pkg_postinst_%s' % pkg, postinst)
 }
+
+do_package[depends] += "ima-evm-utils-native:do_populate_sysroot"

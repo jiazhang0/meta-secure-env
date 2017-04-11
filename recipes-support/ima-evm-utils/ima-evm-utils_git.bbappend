@@ -1,3 +1,7 @@
+#
+# Copyright (C) 2016-2017 Wind River Systems, Inc.
+#
+
 PACKAGES =+ "${PN}-evmctl.static"
 
 do_compile_append_class-target() {
