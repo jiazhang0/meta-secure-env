@@ -26,7 +26,7 @@ PR = "r0"
 SRC_URI = " \
     git://github.com/jiazhang0/SELoader.git \
 "
-SRCREV = "ee6779e5a9205ed30299271a5b594711a2541e5f"
+SRCREV = "10e36a8d5a71ca349b3c1922690f95cfd7f685f3"
 PV = "0.4.4+git${SRCPV}"
 
 COMPATIBLE_HOST = '(i.86|x86_64).*-linux'
