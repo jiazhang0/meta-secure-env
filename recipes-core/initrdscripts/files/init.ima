@@ -109,7 +109,9 @@ if grep -q "ima_appraise=off" "${ROOT_DIR}/proc/cmdline"; then
 else
     keyring_id=`keyctl newring _ima @u`
 
-    for key in /etc/keys/pubkey_evm*.pem; do
+    for key in /etc/keys/pubkey_evm*.pem ${ROOT_DIR}/etc/keys/pubkey_evm*.pem; do
+        [ ! -s "$key" ] && continue
+
         if ! evmctl import --rsa "$key" $keyring_id >"${ROOT_DIR}/dev/null"; then
             print_critical "Unable to load the public key $key for IMA appraisal"
         else
