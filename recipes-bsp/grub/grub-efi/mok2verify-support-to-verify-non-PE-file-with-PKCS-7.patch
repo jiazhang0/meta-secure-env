@@ -1,4 +1,4 @@
-From 4c06bb11e50024131a55d70879e0cdb19d74db51 Mon Sep 17 00:00:00 2001
+From 7b851f8e7f07b5f7ff1a5201d690d26054122fce Mon Sep 17 00:00:00 2001
 From: Lans Zhang <jia.zhang@windriver.com>
 Date: Thu, 16 Mar 2017 14:49:41 +0800
 Subject: [PATCH] mok2verify: support to verify non-PE file with PKCS#7
@@ -8,18 +8,29 @@ MOK2 Verify Protocol is designed to verify non-PE file which cannot be
 verified by the MOK verify protocol supplied by shim loader, such as grub
 configuration, initrd, grub modules and so on.
 
-Each file needs to have a .p7b PKCS#7 signature for verification. For
+Each signed file has a .p7b PKCS#7 signature file for verification. For
 more details about signature format and singing tool, refer to
 https://github.com/jiazhang0/SELoader and https://github.com/jiazhang0/libsign
+
+If the initrd is not authenticated, just go to the failover boot to avoid a
+much worse failure.
+
+In addition, the editor and cmdline modes are disabled if secure boot is
+enabled in order to prevent from tampering the kernel commandline or
+booting unsigned kernel.
 
 Signed-off-by: Lans Zhang <jia.zhang@windriver.com>
 ---
  grub-core/Makefile.core.def    |   6 ++
- grub-core/lib/efi/mok2verify.c | 140 +++++++++++++++++++++++++++++++++++++++++
- grub-core/loader/i386/linux.c  |  75 ++++++++++++++++++++++
- grub-core/normal/main.c        |  14 +++++
- include/grub/efi/mok2verify.h  |  39 ++++++++++++
- 5 files changed, 274 insertions(+)
+ grub-core/commands/boot.c      |  14 +++-
+ grub-core/gfxmenu/gui_label.c  |  39 +++++++++--
+ grub-core/lib/efi/mok2verify.c | 146 +++++++++++++++++++++++++++++++++++++++++
+ grub-core/loader/i386/linux.c  |  80 ++++++++++++++++++++++
+ grub-core/normal/main.c        |  35 +++++++++-
+ grub-core/normal/menu.c        |  34 +++++++---
+ grub-core/normal/menu_text.c   |  32 ++++++---
+ include/grub/efi/mok2verify.h  |  42 ++++++++++++
+ 9 files changed, 400 insertions(+), 28 deletions(-)
  create mode 100644 grub-core/lib/efi/mok2verify.c
  create mode 100644 include/grub/efi/mok2verify.h
 
@@ -40,12 +51,103 @@ index e9e1483..8e72251 100644
    name = mmap;
    common = mmap/mmap.c;
    x86 = mmap/i386/uppermem.c;
+diff --git a/grub-core/commands/boot.c b/grub-core/commands/boot.c
+index 91ec87d..5cddbb6 100644
+--- a/grub-core/commands/boot.c
++++ b/grub-core/commands/boot.c
+@@ -24,6 +24,9 @@
+ #include <grub/kernel.h>
+ #include <grub/mm.h>
+ #include <grub/i18n.h>
++#ifdef GRUB_MACHINE_EFI
++#include <grub/efi/mok2verify.h>
++#endif
+ 
+ GRUB_MOD_LICENSE ("GPLv3+");
+ 
+@@ -143,8 +146,15 @@ grub_loader_boot (void)
+   struct grub_preboot *cur;
+ 
+   if (! grub_loader_loaded)
+-    return grub_error (GRUB_ERR_NO_KERNEL,
+-		       N_("you need to load the kernel first"));
++    {
++#ifdef GRUB_MACHINE_EFI
++      if (grub_is_secured () == 1)
++	return grub_error (GRUB_ERR_BAD_OS,
++			   N_("you need to load the authenticated boot components"));
++#endif
++      return grub_error (GRUB_ERR_NO_KERNEL,
++		         N_("you need to load the kernel first"));
++    }
+ 
+   if (grub_loader_flags & GRUB_LOADER_FLAG_NORETURN)
+     grub_machine_fini ();
+diff --git a/grub-core/gfxmenu/gui_label.c b/grub-core/gfxmenu/gui_label.c
+index 637578f..4a94180 100644
+--- a/grub-core/gfxmenu/gui_label.c
++++ b/grub-core/gfxmenu/gui_label.c
+@@ -23,6 +23,9 @@
+ #include <grub/font.h>
+ #include <grub/gui_string_util.h>
+ #include <grub/i18n.h>
++#ifdef GRUB_MACHINE_EFI
++#include <grub/efi/mok2verify.h>
++#endif
+ 
+ static const char *align_options[] =
+ {
+@@ -180,15 +183,37 @@ label_set_property (void *vself, const char *name, const char *value)
+       else
+ 	{
+ 	   if (grub_strcmp (value, "@KEYMAP_LONG@") == 0)
+-	    value = _("Press enter to boot the selected OS, "
+-	       "`e' to edit the commands before booting "
+-	       "or `c' for a command-line. ESC to return previous menu.");
++	     {
++#ifdef GRUB_MACHINE_EFI
++		if (grub_is_secured () == 1)
++		  value = _("Press enter to boot the selected OS. "
++			    "ESC to return previous menu.");
++		else
++#endif
++		  value = _("Press enter to boot the selected OS, "
++			    "`e' to edit the commands before booting "
++			    "or `c' for a command-line. ESC to return previous menu.");
++	     }
+            else if (grub_strcmp (value, "@KEYMAP_MIDDLE@") == 0)
+-	    value = _("Press enter to boot the selected OS, "
+-	       "`e' to edit the commands before booting "
+-	       "or `c' for a command-line.");
++	     {
++#ifdef GRUB_MACHINE_EFI
++		if (grub_is_secured () == 1)
++		  value = _("Press enter to boot the selected OS.");
++		else
++#endif
++		  value = _("Press enter to boot the selected OS, "
++			    "`e' to edit the commands before booting "
++			    "or `c' for a command-line.");
++	     }
+ 	   else if (grub_strcmp (value, "@KEYMAP_SHORT@") == 0)
+-	    value = _("enter: boot, `e': options, `c': cmd-line");
++	     {
++#ifdef GRUB_MACHINE_EFI
++		if (grub_is_secured () == 1)
++		  value = _("enter: boot");
++		else
++#endif
++		  value = _("enter: boot, `e': options, `c': cmd-line");
++	     }
+ 	   /* FIXME: Add more templates here if needed.  */
+ 	  self->template = grub_strdup (value);
+ 	  self->text = grub_xasprintf (value, self->value);
 diff --git a/grub-core/lib/efi/mok2verify.c b/grub-core/lib/efi/mok2verify.c
 new file mode 100644
-index 0000000..231d5a7
+index 0000000..a712190
 --- /dev/null
 +++ b/grub-core/lib/efi/mok2verify.c
-@@ -0,0 +1,140 @@
+@@ -0,0 +1,146 @@
 +/* mok2verify.c - MOK2 Verify Protocol support
 + *
 + * BSD 2-clause "Simplified" License
@@ -120,6 +222,12 @@ index 0000000..231d5a7
 +
 +static grub_efi_guid_t grub_efi_mok2_verify_protoco_guid = EFI_MOK2_VERIFY_PROTOCOL_GUID;
 +
++int
++grub_is_secured (void)
++{
++  return !!grub_efi_locate_protocol (&grub_efi_mok2_verify_protoco_guid, 0);
++}
++
 +grub_err_t
 +grub_verify_file (const char *path)
 +{
@@ -158,7 +266,7 @@ index 0000000..231d5a7
 +
 +      grub_free (pattern);
 +    }
-+  
++
 +  len = grub_utf8_to_utf16 (file_path, len * GRUB_MAX_UTF16_PER_UTF8,
 +			    (const grub_uint8_t *) real_path, len, 0);
 +  file_path[len] = 0;
@@ -187,7 +295,7 @@ index 0000000..231d5a7
 +  return GRUB_ERR_NONE;
 +}
 diff --git a/grub-core/loader/i386/linux.c b/grub-core/loader/i386/linux.c
-index e2425c8..f6a6ff0 100644
+index e2425c8..c0f999b 100644
 --- a/grub-core/loader/i386/linux.c
 +++ b/grub-core/loader/i386/linux.c
 @@ -34,6 +34,9 @@
@@ -293,8 +401,20 @@ index e2425c8..f6a6ff0 100644
        ptr += cursize;
        grub_memset (ptr, 0, ALIGN_UP_OVERHEAD (cursize, 4));
        ptr += ALIGN_UP_OVERHEAD (cursize, 4);
+@@ -1149,6 +1224,11 @@ grub_cmd_initrd (grub_command_t cmd __attribute__ ((unused)),
+     grub_file_close (files[i]);
+   grub_free (files);
+ 
++#ifdef GRUB_MACHINE_EFI
++  /* An unauthenticated initrd always causes a complete boot failure. */
++  if (grub_is_secured () == 1)
++    grub_loader_unset();
++#endif
+   return grub_errno;
+ }
+ 
 diff --git a/grub-core/normal/main.c b/grub-core/normal/main.c
-index 13473ec..b408143 100644
+index 13473ec..47c023b 100644
 --- a/grub-core/normal/main.c
 +++ b/grub-core/normal/main.c
 @@ -32,6 +32,9 @@
@@ -307,7 +427,29 @@ index 13473ec..b408143 100644
  
  GRUB_MOD_LICENSE ("GPLv3+");
  
-@@ -294,6 +297,17 @@ grub_normal_execute (const char *config, int nested, int batch)
+@@ -226,13 +229,20 @@ grub_normal_init_page (struct grub_term_output *term)
+ {
+   grub_ssize_t msg_len;
+   int posx;
+-  const char *msg = _("GNU GRUB  version %s");
++  const char *msg;
+   char *msg_formatted;
+   grub_uint32_t *unicode_msg;
+   grub_uint32_t *last_position;
+  
+   grub_term_cls (term);
+ 
++#ifdef GRUB_MACHINE_EFI
++  if (grub_is_secured () == 1)
++    msg = _("GNU GRUB  version %s (LOCKED)");
++  else
++#endif
++    msg = _("GNU GRUB  version %s");
++
+   msg_formatted = grub_xasprintf (msg, PACKAGE_VERSION);
+   if (!msg_formatted)
+     return;
+@@ -294,6 +304,24 @@ grub_normal_execute (const char *config, int nested, int batch)
  
    if (config)
      {
@@ -317,20 +459,157 @@ index 13473ec..b408143 100644
 +      err = grub_verify_file (config);
 +      if (err != GRUB_ERR_NONE)
 +	{
-+	  grub_error (err, "failed to verify grub.cfg");
-+	  return;
++	  grub_error (err, "Security Violation: grub.cfg failed to load");
++	  grub_print_error ();
++
++	  /* System halt. */
++	  asm volatile ("cli");
++	  while (1)
++	    {
++		asm volatile ("hlt");
++	    }
 +	}
 +#endif
 +
        menu = read_config_file (config);
  
        /* Ignore any error.  */
+@@ -317,7 +345,10 @@ grub_enter_normal_mode (const char *config)
+ {
+   nested_level++;
+   grub_normal_execute (config, 0, 0);
+-  grub_cmdline_run (0);
++#ifdef GRUB_MACHINE_EFI
++  if (!grub_is_secured ())
++#endif
++    grub_cmdline_run (0);
+   nested_level--;
+   if (grub_normal_exit_level)
+     grub_normal_exit_level--;
+diff --git a/grub-core/normal/menu.c b/grub-core/normal/menu.c
+index 7e0a158..c01a841 100644
+--- a/grub-core/normal/menu.c
++++ b/grub-core/normal/menu.c
+@@ -32,6 +32,9 @@
+ #include <grub/script_sh.h>
+ #include <grub/gfxterm.h>
+ #include <grub/dl.h>
++#ifdef GRUB_MACHINE_EFI
++#include <grub/efi/mok2verify.h>
++#endif
+ 
+ /* Time to delay after displaying an error message about a default/fallback
+    entry failing to boot.  */
+@@ -564,7 +567,10 @@ run_menu (grub_menu_t menu, int nested, int *auto_boot)
+ 	  if (timeout >= 0)
+ 	    {
+ 	      grub_env_unset ("timeout");
+-	      grub_env_unset ("fallback");
++#ifdef GRUB_MACHINE_EFI
++	      if (!grub_is_secured ())
++#endif
++		grub_env_unset ("fallback");
+ 	      clear_timeout ();
+ 	    }
+ 
+@@ -633,18 +639,28 @@ run_menu (grub_menu_t menu, int nested, int *auto_boot)
+ 	      break;
+ 
+ 	    case 'c':
+-	      menu_fini ();
+-	      grub_cmdline_run (1);
+-	      goto refresh;
++#ifdef GRUB_MACHINE_EFI
++	      if (!grub_is_secured ())
++#endif
++		{
++		  menu_fini ();
++		  grub_cmdline_run (1);
++		  goto refresh;
++		}
+ 
+ 	    case 'e':
+-	      menu_fini ();
++#ifdef GRUB_MACHINE_EFI
++	      if (!grub_is_secured ())
++#endif
+ 		{
+-		  grub_menu_entry_t e = grub_menu_get_entry (menu, current_entry);
+-		  if (e)
+-		    grub_menu_entry_run (e);
++		  menu_fini ();
++		    {
++		      grub_menu_entry_t e = grub_menu_get_entry (menu, current_entry);
++		      if (e)
++			grub_menu_entry_run (e);
++		    }
++		  goto refresh;
+ 		}
+-	      goto refresh;
+ 
+ 	    default:
+ 	      {
+diff --git a/grub-core/normal/menu_text.c b/grub-core/normal/menu_text.c
+index 1687c28..f2587d5 100644
+--- a/grub-core/normal/menu_text.c
++++ b/grub-core/normal/menu_text.c
+@@ -27,6 +27,9 @@
+ #include <grub/menu_viewer.h>
+ #include <grub/i18n.h>
+ #include <grub/charset.h>
++#ifdef GRUB_MACHINE_EFI
++#include <grub/efi/mok2verify.h>
++#endif
+ 
+ static grub_uint8_t grub_color_menu_normal;
+ static grub_uint8_t grub_color_menu_highlight;
+@@ -179,19 +182,32 @@ command-line or ESC to discard edits and return to the GRUB menu."),
+ 
+       if (nested)
+ 	{
++#ifdef GRUB_MACHINE_EFI
++	  if (grub_is_secured () == 1)
++	    msg = _("Press enter to boot the selected OS. "
++		    "ESC to return previous menu.");
++	  else
++#endif
++	    msg = _("Press enter to boot the selected OS, "
++		    "`e' to edit the commands before booting "
++		    "or `c' for a command-line. ESC to return previous menu.");
++
+ 	  ret += grub_print_message_indented_real
+-	    (_("Press enter to boot the selected OS, "
+-	       "`e' to edit the commands before booting "
+-	       "or `c' for a command-line. ESC to return previous menu."),
+-	     STANDARD_MARGIN, STANDARD_MARGIN, term, dry_run);
++	    (msg, STANDARD_MARGIN, STANDARD_MARGIN, term, dry_run);
+ 	}
+       else
+ 	{
++#ifdef GRUB_MACHINE_EFI
++	  if (grub_is_secured () == 1)
++	    msg = _("Press enter to boot the selected OS.");
++	  else
++#endif
++	    msg = _("Press enter to boot the selected OS, "
++		    "`e' to edit the commands before booting "
++		    "or `c' for a command-line.");
++
+ 	  ret += grub_print_message_indented_real
+-	    (_("Press enter to boot the selected OS, "
+-	       "`e' to edit the commands before booting "
+-	       "or `c' for a command-line."),
+-	     STANDARD_MARGIN, STANDARD_MARGIN, term, dry_run);
++	    (msg, STANDARD_MARGIN, STANDARD_MARGIN, term, dry_run);
+ 	}	
+     }
+   return ret;
 diff --git a/include/grub/efi/mok2verify.h b/include/grub/efi/mok2verify.h
 new file mode 100644
-index 0000000..4281ea6
+index 0000000..cc9c1d3
 --- /dev/null
 +++ b/include/grub/efi/mok2verify.h
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,42 @@
 +/*
 + * mok2verify.h - interface to MOK2 Verify Protocol
 + *
@@ -365,6 +644,9 @@ index 0000000..4281ea6
 +#define GRUB_EFI_MOK2_VERIFY_HEADER 1
 +
 +#include <grub/types.h>
++
++int
++EXPORT_FUNC (grub_is_secured) (void);
 +
 +grub_err_t
 +EXPORT_FUNC (grub_verify_file) (const char *path);

@@ -21,10 +21,16 @@ this entry point expects to be called with SysV ABI rather than MSABI, and
 so calls to it should not be wrapped.
 [ End of Quote ]
 
-With the SELoader support, the grub.cfg, kernel (without EFI stub support)
-and initrd can be validated as well. Therefore, using UEFI Secure Boot, the
-shim loader and the SELoader together, the boot process is completely
-trustworthy.
+With the SELoader support, the grub.cfg, kernel (even without EFI stub support)
+and initrd can be validated as well.
+
+In addition, the grub can lock the editor and cmdline modes to prevent from
+tampering the kernel commandline in a boot option or overwriting the default
+kernel commandline. This lockdown protection can defeat the attempts to disable
+the kernel security mechanisms.
+
+Therefore, using UEFI Secure Boot, the shim loader and the SELoader together,
+the boot process is completely trustworthy.
 
 A complete verification flow with MOK Secure Boot is:
 UEFI BIOS boot manager (UEFI Secure Boot enabled) ->
@@ -57,12 +63,6 @@ For a good user experience, shim + SELoader + grub is an excellent combination
 to handle Microsoft certificated hardware. With this model, grub is signed by
 the vendor certificate or MOK certificate without being subject to the limit
 from Microsoft's signing policy, and the extra step is thus omitted.
-
-Why not using MOK Secure Boot and shim
---------------------------------------
-If the user hopes to use the self-owned keys and doesn't concern about the
-inconvenience of manual key provision for UEFI Secure Boot, the shim loader
-will become unnecessary.
 
 Build
 =====
