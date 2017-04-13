@@ -4,7 +4,7 @@
 
 menuentry "Sample EFI boot" {
     savedefault
-    set fallback="Sample EFI boot (Recovery)"
+    set fallback=1
     chainloader /bzImage root=/dev/sda2 ro rootwait initrd=/initrd
 }
 
