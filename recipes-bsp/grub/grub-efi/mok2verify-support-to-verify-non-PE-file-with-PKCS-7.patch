@@ -1,4 +1,4 @@
-From 7b851f8e7f07b5f7ff1a5201d690d26054122fce Mon Sep 17 00:00:00 2001
+From c47b4c12f9d838683e593e604e3cf3d979678fc1 Mon Sep 17 00:00:00 2001
 From: Lans Zhang <jia.zhang@windriver.com>
 Date: Thu, 16 Mar 2017 14:49:41 +0800
 Subject: [PATCH] mok2verify: support to verify non-PE file with PKCS#7
@@ -295,7 +295,7 @@ index 0000000..a712190
 +  return GRUB_ERR_NONE;
 +}
 diff --git a/grub-core/loader/i386/linux.c b/grub-core/loader/i386/linux.c
-index e2425c8..c0f999b 100644
+index e2425c8..5a12444 100644
 --- a/grub-core/loader/i386/linux.c
 +++ b/grub-core/loader/i386/linux.c
 @@ -34,6 +34,9 @@
@@ -407,7 +407,7 @@ index e2425c8..c0f999b 100644
  
 +#ifdef GRUB_MACHINE_EFI
 +  /* An unauthenticated initrd always causes a complete boot failure. */
-+  if (grub_is_secured () == 1)
++  if (grub_is_secured () == 1 && grub_errno != GRUB_ERR_NONE)
 +    grub_loader_unset();
 +#endif
    return grub_errno;
