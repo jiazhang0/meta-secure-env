@@ -28,7 +28,7 @@ SRC_URI += " \
     ${EXTRA_SRC_URI} \
 "
 
-GRUB_BUILDIN_append = " chain ${@'efivar' if d.getVar('UEFI_SB', True) == '1' else ''}"
+GRUB_BUILDIN_append = " chain ${@'efivar mok2verify' if d.getVar('UEFI_SB', True) == '1' else ''}"
 
 # For efi_call_foo and efi_shim_exit
 CFLAGS_append = " -fno-toplevel-reorder"
