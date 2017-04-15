@@ -1,4 +1,4 @@
-From c47b4c12f9d838683e593e604e3cf3d979678fc1 Mon Sep 17 00:00:00 2001
+From cf8faf9767692a6a45bb7e0bcde854e32d5bb73c Mon Sep 17 00:00:00 2001
 From: Lans Zhang <jia.zhang@windriver.com>
 Date: Thu, 16 Mar 2017 14:49:41 +0800
 Subject: [PATCH] mok2verify: support to verify non-PE file with PKCS#7
@@ -27,10 +27,10 @@ Signed-off-by: Lans Zhang <jia.zhang@windriver.com>
  grub-core/lib/efi/mok2verify.c | 146 +++++++++++++++++++++++++++++++++++++++++
  grub-core/loader/i386/linux.c  |  80 ++++++++++++++++++++++
  grub-core/normal/main.c        |  35 +++++++++-
- grub-core/normal/menu.c        |  34 +++++++---
+ grub-core/normal/menu.c        |  29 +++++---
  grub-core/normal/menu_text.c   |  32 ++++++---
  include/grub/efi/mok2verify.h  |  42 ++++++++++++
- 9 files changed, 400 insertions(+), 28 deletions(-)
+ 9 files changed, 396 insertions(+), 27 deletions(-)
  create mode 100644 grub-core/lib/efi/mok2verify.c
  create mode 100644 include/grub/efi/mok2verify.h
 
@@ -487,7 +487,7 @@ index 13473ec..47c023b 100644
    if (grub_normal_exit_level)
      grub_normal_exit_level--;
 diff --git a/grub-core/normal/menu.c b/grub-core/normal/menu.c
-index 7e0a158..c01a841 100644
+index 7e0a158..987278c 100644
 --- a/grub-core/normal/menu.c
 +++ b/grub-core/normal/menu.c
 @@ -32,6 +32,9 @@
@@ -500,19 +500,7 @@ index 7e0a158..c01a841 100644
  
  /* Time to delay after displaying an error message about a default/fallback
     entry failing to boot.  */
-@@ -564,7 +567,10 @@ run_menu (grub_menu_t menu, int nested, int *auto_boot)
- 	  if (timeout >= 0)
- 	    {
- 	      grub_env_unset ("timeout");
--	      grub_env_unset ("fallback");
-+#ifdef GRUB_MACHINE_EFI
-+	      if (!grub_is_secured ())
-+#endif
-+		grub_env_unset ("fallback");
- 	      clear_timeout ();
- 	    }
- 
-@@ -633,18 +639,28 @@ run_menu (grub_menu_t menu, int nested, int *auto_boot)
+@@ -633,18 +636,28 @@ run_menu (grub_menu_t menu, int nested, int *auto_boot)
  	      break;
  
  	    case 'c':
