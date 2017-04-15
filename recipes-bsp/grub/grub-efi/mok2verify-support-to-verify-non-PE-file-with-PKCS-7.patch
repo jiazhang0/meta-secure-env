@@ -1,4 +1,4 @@
-From cf8faf9767692a6a45bb7e0bcde854e32d5bb73c Mon Sep 17 00:00:00 2001
+From 7426e2973658160849055ef54b212ea3daf08333 Mon Sep 17 00:00:00 2001
 From: Lans Zhang <jia.zhang@windriver.com>
 Date: Thu, 16 Mar 2017 14:49:41 +0800
 Subject: [PATCH] mok2verify: support to verify non-PE file with PKCS#7
@@ -15,8 +15,8 @@ https://github.com/jiazhang0/SELoader and https://github.com/jiazhang0/libsign
 If the initrd is not authenticated, just go to the failover boot to avoid a
 much worse failure.
 
-In addition, the editor and cmdline modes are disabled if secure boot is
-enabled in order to prevent from tampering the kernel commandline or
+In addition, the editor, rescue and cmdline modes are disabled if secure boot
+is enabled in order to prevent from tampering the kernel commandline or
 booting unsigned kernel.
 
 Signed-off-by: Lans Zhang <jia.zhang@windriver.com>
@@ -26,11 +26,11 @@ Signed-off-by: Lans Zhang <jia.zhang@windriver.com>
  grub-core/gfxmenu/gui_label.c  |  39 +++++++++--
  grub-core/lib/efi/mok2verify.c | 146 +++++++++++++++++++++++++++++++++++++++++
  grub-core/loader/i386/linux.c  |  80 ++++++++++++++++++++++
- grub-core/normal/main.c        |  35 +++++++++-
+ grub-core/normal/main.c        |  54 +++++++++++++--
  grub-core/normal/menu.c        |  29 +++++---
  grub-core/normal/menu_text.c   |  32 ++++++---
  include/grub/efi/mok2verify.h  |  42 ++++++++++++
- 9 files changed, 396 insertions(+), 27 deletions(-)
+ 9 files changed, 413 insertions(+), 29 deletions(-)
  create mode 100644 grub-core/lib/efi/mok2verify.c
  create mode 100644 include/grub/efi/mok2verify.h
 
@@ -414,7 +414,7 @@ index e2425c8..5a12444 100644
  }
  
 diff --git a/grub-core/normal/main.c b/grub-core/normal/main.c
-index 13473ec..47c023b 100644
+index 13473ec..b997a08 100644
 --- a/grub-core/normal/main.c
 +++ b/grub-core/normal/main.c
 @@ -32,6 +32,9 @@
@@ -486,6 +486,39 @@ index 13473ec..47c023b 100644
    nested_level--;
    if (grub_normal_exit_level)
      grub_normal_exit_level--;
+@@ -352,6 +383,18 @@ grub_cmd_normal (struct grub_command *cmd __attribute__ ((unused)),
+     grub_enter_normal_mode (argv[0]);
+ 
+ quit:
++#ifdef GRUB_MACHINE_EFI
++  if (grub_is_secured () == 1)
++    {
++      /* Never return from the normal mode */
++      asm volatile ("cli");
++
++      while (1)
++	{
++	  asm volatile ("hlt");
++	}
++    }
++#endif
+   return 0;
+ }
+ 
+@@ -527,8 +570,11 @@ GRUB_MOD_INIT(normal)
+   /* Register a command "normal" for the rescue mode.  */
+   grub_register_command ("normal", grub_cmd_normal,
+ 			 0, N_("Enter normal mode."));
+-  grub_register_command ("normal_exit", grub_cmd_normal_exit,
+-			 0, N_("Exit from normal mode."));
++#ifdef GRUB_MACHINE_EFI
++  if (!grub_is_secured ())
++#endif
++    grub_register_command ("normal_exit", grub_cmd_normal_exit,
++			   0, N_("Exit from normal mode."));
+ 
+   /* Reload terminal colors when these variables are written to.  */
+   grub_register_variable_hook ("color_normal", NULL, grub_env_write_color_normal);
 diff --git a/grub-core/normal/menu.c b/grub-core/normal/menu.c
 index 7e0a158..987278c 100644
 --- a/grub-core/normal/menu.c

@@ -24,10 +24,10 @@ so calls to it should not be wrapped.
 With the SELoader support, the grub.cfg, kernel (even without EFI stub support)
 and initrd can be validated as well.
 
-In addition, the grub can lock the editor and cmdline modes to prevent from
-tampering the kernel commandline in a boot option or overwriting the default
-kernel commandline. This lockdown protection can defeat the attempts to disable
-the kernel security mechanisms.
+In addition, the grub can lock the editor, rescue and cmdline modes to prevent
+from tampering the kernel commandline in a boot option or overwriting the
+default kernel commandline. This lockdown protection can defeat the attempts to
+disable the kernel security mechanisms.
 
 Therefore, using UEFI Secure Boot, the shim loader and the SELoader together,
 the boot process is completely trustworthy.
