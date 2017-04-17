@@ -38,18 +38,17 @@ do_configure() {
         export TMPDIR=${B}
         lib/ccan.git/tools/create-ccan-tree \
             --build-type=automake lib/ccan \
-                talloc read_write_all build_assert array_size  ||  exit 2
+                talloc read_write_all build_assert array_size || exit 2
     fi
 
     export CC="${OLD_CC}"
-    export CFLAGS="-I${STAGING_INCDIR}/efi -I${STAGING_INCDIR}/efi/x86_64"
     ./autogen.sh --noconfigure
     oe_runconf
 }
 
-EXTRA_OEMAKE = "\
-    INCLUDES='-I../lib/ccan.git/ \
-              -I${STAGING_INCDIR}/efi \
-              -I${STAGING_INCDIR} \
-              -I${STAGING_INCDIR}/efi/\${SBSIGN_HOST_ARCH}' \
+EXTRA_OEMAKE += " \
+    INCLUDES='-I../lib/ccan.git/' \
+    EFI_CPPFLAGS='-DEFI_FUNCTION_WRAPPER \
+                  -I${STAGING_INCDIR}/efi \
+                  -I${STAGING_INCDIR}/efi/${BUILD_ARCH}' \
 "
