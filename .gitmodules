@@ -13,3 +13,7 @@
 [submodule "layers/meta-signing-key"]
 	path = layers/meta-signing-key
 	url = https://github.com/jiazhang0/meta-signing-key.git
+[submodule "layers/meta-measured"]
+	path = layers/meta-measured
+	url = https://github.com/WindRiver-OpenSourceLabs/meta-measured.git
+	branch = pulsar-8
