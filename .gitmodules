@@ -1,0 +1,15 @@
+[submodule "layers/meta-rpm-signing"]
+	path = layers/meta-rpm-signing
+	url = https://github.com/jiazhang0/meta-rpm-signing.git
+[submodule "layers/meta-efi-secure-boot"]
+	path = layers/meta-efi-secure-boot
+	url = https://github.com/jiazhang0/meta-efi-secure-boot.git
+[submodule "layers/meta-encrypted-storage"]
+	path = layers/meta-encrypted-storage
+	url = https://github.com/jiazhang0/meta-encrypted-storage.git
+[submodule "layers/meta-integrity"]
+	path = layers/meta-integrity
+	url = https://github.com/jiazhang0/meta-integrity.git
+[submodule "layers/meta-signing-key"]
+	path = layers/meta-signing-key
+	url = https://github.com/jiazhang0/meta-signing-key.git
