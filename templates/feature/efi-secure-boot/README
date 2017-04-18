@@ -13,7 +13,7 @@ Build
 =====
 
 In order to enable this feature, add the path to
-feature/uefi-secure-boot/template.conf to the init script.
+feature/efi-secure-boot/template.conf to the init script.
 
 Dependency
 ==========

@@ -57,7 +57,7 @@ Of course, the user can manually remove all default certificates and use
 the self-owned keys to have a working UEFI Secure Boot, but this is not
 working for ODM/OEM customers because this extra step is bad for the user
 experience. Refer to the section "Out-of-box Experience" in
-feature/uefi-secure-boot/README for the details.
+feature/efi-secure-boot/README for the details.
 
 For a good user experience, shim + SELoader + grub is an excellent combination
 to handle Microsoft certificated hardware. With this model, grub is signed by
@@ -73,7 +73,7 @@ feature/mok-secure-boot/template.conf to the init script.
 Dependency
 ==========
 
-This feature depends on feature/uefi-secure-boot.
+This feature depends on feature/efi-secure-boot.
 
 Key Management
 ==============
@@ -122,7 +122,7 @@ keys owned by the user.
 Automatic Certificate Provision
 -------------------------------
 Refer to the section "Automatic Certificate Provision" in
-feature/uefi-secure-boot/README. MOK Secure Boot is on top of UEFI Secure Boot
+feature/efi-secure-boot/README. MOK Secure Boot is on top of UEFI Secure Boot
 so it is still necessary to provision UEFI Secure Boot before using MOK Secure
 Boot.
 
@@ -373,7 +373,7 @@ verification protocol installed by SELoader to validate the initramfs image.
 Work Flow For The First Boot
 ============================
 
-- Build a project with this template and feature/uefi-secure-boot
+- Build a project with this template and feature/efi-secure-boot
 
 - Deploy the rootfs
 
