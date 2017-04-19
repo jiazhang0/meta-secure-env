@@ -45,6 +45,7 @@ python package_ima_hook() {
             bb.note("Preparing to sign %s ..." % _)
 
             sh_name = pipes.quote(_)
+            print("Signing command: %s" % cmd + sh_name)
             rc, res = oe.utils.getstatusoutput(cmd + sh_name)
             if rc:
                 bb.fatal('Calculate IMA signature for %s failed with exit code %s:\n%s' % \
