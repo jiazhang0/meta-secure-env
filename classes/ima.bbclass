@@ -17,12 +17,20 @@ python package_ima_hook() {
     packages = d.getVar('PACKAGES', True)
     pkgdest = d.getVar('PKGDEST', True)
 
-    pkg_blacklist = ('dbg', 'dev', 'doc', 'locale', 'staticdev')
+    pkg_suffix_blacklist = ('dbg', 'dev', 'doc', 'locale', 'staticdev')
+
+    pkg_blacklist = ()
+    with open('${IMA_SIGNING_BLACKLIST}', 'r') as f:
+        pkg_blacklist = [ _.strip() for _ in f.readlines() ]
+        pkg_blacklist = tuple(pkg_blacklist)
 
     import base64, pipes, stat
 
     for pkg in packages.split():
-        if (pkg.split('-')[-1] in pkg_blacklist) is True:
+        if (pkg.split('-')[-1] in pkg_suffix_blacklist) is True:
+            continue
+
+        if pkg.startswith(pkg_blacklist) is True:
             continue
 
         bb.note("Writing IMA %%post hook for %s ..." % pkg)
