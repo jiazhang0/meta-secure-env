@@ -57,7 +57,11 @@ EXTRA_OPENSSL_SRC_URI = " \
     file://0076-Create-tmp-flag-file-for-autosign-rpm-packages.patch \
     file://0077-Enable-configuration-for-gpg-digest-algorithm.patch \
 "
-SRC_URI_append = " ${@base_contains('PACKAGECONFIG', 'openssl', '${EXTRA_OPENSSL_SRC_URI}', '', d)}"
+SRC_URI_append = " \
+    file://rpm-key-import.service \
+    file://rpm-key-import.sh \
+    ${@base_contains('PACKAGECONFIG', 'openssl', '${EXTRA_OPENSSL_SRC_URI}', '', d)} \
+"
 
 SRC_URI_append_openssl-fips = "\
 	file://rpm-openssl-fips-crypto.patch \
@@ -91,7 +95,7 @@ QEMUDEP ??= ""
 QEMUDEP_openssl-fips_x86-64 = "qemu-native"
 DEPENDS += "${QEMUDEP}"
 
-inherit qemu
+inherit qemu systemd
 
 # Based on the qemu_run_binary
 def qemu_gen_runpath(data, rootfs_path):
@@ -193,4 +197,17 @@ do_install_append() {
 	sed -i -e 's,%_build_file_digest_algo.*,%_build_file_digest_algo ${RPM_FILE_DIGEST_ALGO},' ${D}/${libdir}/rpm/macros.rpmbuild
 	sed -i -e 's,%_build_sign.*,%_build_sign ${RPM_SELF_SIGN_ALGO},' ${D}/${libdir}/rpm/macros.rpmbuild
 	sed -i -e 's,%_gpg_digest_algo.*,%_gpg_digest_algo ${RPM_GPG_DIGEST_ALGO},' ${D}/${libdir}/rpm/macros
+
+	install -d ${D}${systemd_unitdir}/system
+	install -m 0644 ${WORKDIR}/rpm-key-import.service ${D}${systemd_unitdir}/system
+
+	install -d ${D}${sbindir}
+	install -m 0700 ${WORKDIR}/rpm-key-import.sh ${D}${sbindir}
 }
+
+SYSTEMD_PACKAGES += "${PN}"
+SYSTEMD_SERVICE_${PN} += "rpm-key-import.service"
+
+FILES_${PN} += " \
+    ${sbindir}/rpm-key-import.sh \
+"
