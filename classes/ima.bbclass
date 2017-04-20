@@ -4,9 +4,6 @@
 
 inherit package
 
-# XXX: Using UKS causes recursive dependency
-#inherit user-key-store
-
 PACKAGEFUNCS =+ "package_ima_hook"
 
 # security.ima is generated during the RPM build, and the base64-encoded
