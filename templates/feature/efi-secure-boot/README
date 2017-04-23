@@ -1,19 +1,37 @@
 UEFI Secure Boot
 ================
 
-UEFI secure boot is the industry standard defined in the UEFI spec, allowing
-the images loaded by UEFI BIOS to be verified with the trusted key.
+UEFI Secure Boot is the industry standard defined in the UEFI spec, allowing
+the images loaded by UEFI BIOS to be verified with the trusted keys.
 
-A complete verification flow with UEFI secure boot is:
-UEFI BIOS (UEFI secure boot enabled) ->
-    grub2 (verified by DB certificate) ->
-        kernel (verified by DB certificate)
+With the extension provided by SELoader bootloader, grub configuration files,
+kernel (even without EFI stub support) and initrd can be authenticated as well.
+
+In addition, grub is enhanced to support lockdown mode. In this mode, the
+edit, rescue and command line is protected in order to prevent from
+tampering the kernel commandline or loading an unsigned boot component. Hence,
+this lockdown protection can effectively defeat the attempts to disable the
+kernel security mechanisms. The flexibility is also provided if the user
+authentication is enabled. The user authenticated by a password check can enter
+into edit and command line.
+
+Therefore, using UEFI Secure Boot, SELoader, and grub lockdown together, the
+boot process is completely trustworthy.
+
+A complete verification flow with UEFI Secure Boot is:
+
+UEFI BIOS boot manager (UEFI Secure Boot enabled) ->
+    SELoader (verified by DB certificate) ->
+        grub (verified by DB certificate) ->
+            grub.cfg (verified by DB certificate)
+            kernel (verified by DB certificate)
+            initrd (verified by DB certificate)
 
 Build
 =====
 
 In order to enable this feature, add the path to
-feature/efi-secure-boot/template.conf to the init script.
+feature/uefi-secure-boot/template.conf to conf/local.conf.
 
 Dependency
 ==========
@@ -23,10 +41,13 @@ This feature doesn't depend on other layer or template.
 Key Management
 ==============
 
+Refer to README.user-key-store for the initial cognition about key management
+for UEFI Secure Boot.
+
 Note that the sample key and user key are the concepts in the key signing
-model according to the ownership and secrecy. In UEFI secure boot, the policy
-object such as PK, KEK, DB and DBX will be mapped to a key managed by the
-key signing model.
+model according to the ownership and secrecy. In UEFI Secure Boot, a policy
+object such as PK, KEK, DB and DBX is mapped to a key managed by the key
+signing model.
 
 Sample Keys
 -----------
@@ -68,12 +89,12 @@ uses the following key pairs:
 
 User Keys
 ---------
-Refer to feature/user-key-store-test for the details about how to generate/use
-the keys owned by the user.
+Refer to README.user-key-store for the details about how to generate/use
+the keys owned by the end user.
 
 Automatic Certificate Provision
 -------------------------------
-The certificate provision is required to enable UEFI secure boot. By default,
+The certificate provision is required to enable UEFI Secure Boot. By default,
 the target may be provisioned with the default certificates enrolled during the
 manufacture.
 
@@ -82,82 +103,77 @@ key to boot up the system, refer to the instructions listed in the section
 "Work Flow For The First Boot".
 
 Remove the enrolled certificates in BIOS setup
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The LockDown.efi application is used to run the provision. However,
-LockDown.efi cannot be launched if UEFI secure boot is already enabled. In
+LockDown.efi cannot be launched if UEFI Secure Boot is already enabled. In
 addition, the enrolled certificates may be not the ones the user hopes to use.
 
 The provisioned certificates can be removed in BIOS setup. The detailed steps
 may vary between the boards. Refer to BIOS manual for the details.
 
 Launch the automatic provision
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Lockdown.efi will automatically provision UEFI secure boot after removing the
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Lockdown.efi will automatically provision UEFI Secure Boot after removing the
 the provisioned certificates in BIOS setup. More specifically, the PK, KEK,
 DB and DBX (if any) will be enrolled and begin to take affect after a reboot.
 
-Turn on UEFI secure boot option
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If UEFI secure boot option is turned off, the user has to enter into BIOS setup
+Turn on UEFI Secure Boot option
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If UEFI Secure Boot option is turned off, the user has to enter into BIOS setup
 after provision to manually turn on the option.
 
 If the option is already enabled when removing the enrolled certificates in
 BIOS setup, this step can be ignored.
 
 Re-trigger automatic provision
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-By default, the "Automatica Certificate Provision" option is hidden in boot
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+By default, the "Automatic Certificate Provision" option is hidden in boot
 menu for the first boot. If the user would like to clear the certificates
-provisioned by the "Automatica Certificate Provision" option in BIOS setup, this
-hidden boot option will be shown in boot menu, allowing to re-trgger it when
+provisioned by the "Automatic Certificate Provision" option in BIOS setup, this
+hidden boot option will be shown in boot menu, allowing to re-trigger it when
 necessary.
 
 Verification
 ============
 
-By default, the build system will use DB.key to automatically sign grub2 and
-kernel image during the build. Meanwhile, LockDown.efi as above mentioned will
-enroll the corresponding certificate into DB to grant the grub2/kernel
-verification for the next boot.
+By default, the build system will use DB.key to automatically sign all boot
+components including SELoader, EFI drivers, grub, grub configuration files,
+kernel and initrd during the build. Meanwhile, LockDown.efi as above mentioned
+will enroll the corresponding certificate into DB to grant the verification to
+all boot components for the next boot.
 
-Bootloader Verification
------------------------
-More specifically, UEFI BIOS will validate the integrity of grub2 before
-running it with a certificate in DB. Usually, grub2 is signed with the
-DB.key corresponding to DB.pem.
+Boot Component Verification
+---------------------------
+More specifically, UEFI BIOS will validate the integrity of a boot component
+before running it with a certificate in DB.
 
-Either situation will cause the failure of verification.
-- grub2 is not signed.
-- grub2 is signed with DB.key which doesn't correspond to any certificate in
-  DB.
-- grub2 is signed with DB.key which corresponds to a certificate in DBX.
+Either situation will cause the failure of verification to a boot component.
+- A boot component is not signed.
+- A boot component is signed by a key which doesn't correspond to any
+  certificate in DB.
+- A boot component is signed by a key which corresponds to a certificate in DBX.
 
-Of course, all above conclusions assume UEFI secure boot is already enabled.
+Each boot component may have different verification failure phenomenon.
+- If SELoader fails signature check, UEFI BIOS boot manager will print an error
+  message about the image authentication failure.
+- If grub fails signature check, an image authentication failure message is
+  printed and the system hangs.
+- If a grub configuration file fails the signature check, an authentication
+  failure message is printed and grub hangs.
+- If kernel image fails signature check, grub returns back to the boot menu.
+- If initrd fails signature check, grub returns back to the boot menu.
 
-Kernel Verification
--------------------
-When grub2 loads kernel image with the chainloader command, if UEFI Secure
-Boot is already enabled in BIOS, the UEFI BIOS uses the same rules to check
-the integrity of kernel image.
+Grub Lockdown
+-------------
+In order to prevent from tampering the kernel commandline or loading an
+unsigned boot component, grub is locked if UEFI Secure Boot is enabled. In this
+situation, the end user cannot enter into command or edit line via pressing 'c'
+and 'e'.
 
-- Kenrel image must be signed with DB.key.
-- The DB.key must correspond to a certificate in DB.
-- The DB.key mustn't correspond to any certificate in DBX.
+If the user authentication is enabled, the access to command or edit line is
+protected by a password. In this situation, grub is unlockable.
 
-Manually Sign Kernel Image
---------------------------
-Run the following commands on the build host:
-
-$ cd $project
-$ tmp/sysroots/x86_64-linux/usr/bin/sbsign \
-    --key <key> --cert <cert> --output bzImage.signed \
-    tmp/deploy/images/intel-corei7-64/efi-unsigned/bzImage
-$ tmp/sysroots/x86_64-linux/usr/bin/sbsign \
-    --key <key> --cert <cert> --output grub.efi.signed \
-    tmp/deploy/images/intel-corei7-64/efi-unsigned/bootx64.efi
-
-where <key> is the private key file used to sign the kernel image, and <cert>
-is the corresponding certificate file.
+Rescue mode is always disabled as long as UEFI Secure Boot is enabled.
 
 Out-of-box Experience
 =====================
@@ -167,39 +183,36 @@ with a default certificate used to verify the bootloader and issued by
 Microsoft Corporation UEFI CA 2011. This kind of hardware is so-called
 Microsoft certificated hardware.
 
-This means the grub2 must be signed by Microsoft. Otherwise the system cannot
+This means grub must be signed by Microsoft. Otherwise the system cannot
 boot up. However, Microsoft signing policy refuses to sign any bootloaders
 licensed under GPLv3.
 
 For this situation, there are 2 solutions.
 
-Note: assuming the end user still needs to use secure boot.
+Note: assuming the end user still needs to use UEFI Secure Boot.
 
 Run a key provision by self
 ---------------------------
-A present user needs to disable UEFI secure boot in BIOS setup first and
+A present user needs to disable UEFI Secure Boot in BIOS setup first and
 enroll the self-owned certificate to replace the default Microsoft certificate,
-and then sign grub2 and kernel with the self-owned key. Refer to the section
+and then sign grub and kernel with the self-owned key. Refer to the section
 "Automatic Certificate Provision" for details about how to make the key
-enrollment automatic, and refer to feature/user-key-store-test to use the
-self-owned key for signing during the build.
+enrollment automatic, and refer to README.user-key-store to use the self-owned
+key for signing during the build.
 
-Use MOK secure boot
+Use MOK Secure Boot
 -------------------
-Alternately, the shim loader provided by MOK secure boot can be used without
+Alternately, the shim loader provided by MOK Secure Boot can be used without
 the necessity of replacing the default Microsoft certificate. This is valuable
 to avoid manual certificate provision for the user experience.
 
-This solution hints the shim loader needs to be signed by Microsoft. MOK secure
-boot can provide such a signed shim loader with some limits.
+This solution hints the shim loader needs to be signed by Microsoft.
 
-See feature/mok-secure-boot for the details about MOK secure boot and shim. See
+See feature/mok-secure-boot for the details about MOK Secure Boot and shim. See
 feature/msft about the use of shim binary signed by Microsoft.
 
 Work Flow For The First Boot
 ============================
-
-Assuming the user uses UEFI secure boot only.
 
 - Build a project with this template
 
@@ -208,7 +221,7 @@ Assuming the user uses UEFI secure boot only.
 - Boot up the target board
 
 - Enter to BIOS setup and remove the enrolled certificates
-  * It is recommended to turn on UEFI secure boot option if allowed.
+  * It is recommended to still turn on UEFI Secure Boot option if allowed.
 
 - Launch a reboot via ctrl + alt + del
   * Otherwise, a misleading error message about the verification failure
@@ -216,32 +229,6 @@ Assuming the user uses UEFI secure boot only.
 
 - Automatically boot to "Automatic Certificate Provision"
 
-- (Optional) Enter into BIOS setup to turn on UEFI secure boot option
+- (Optional) Enter into BIOS setup to turn on UEFI Secure Boot option
 
-- Boot to the system with the protection provided by UEFI secure boot
-
-Notes
-=====
-
-Don't use the linux command in grub.cfg
----------------------------------------
-Be aware of the fact that the linux command used to parse and load kernel
-image is not working on the verification of kernel image. Actually it
-follows up linux boot protocol and doesn't run into the validation path
-provided by UEFI secure boot. Therefore, the boot menu entry written in
-grub.cfg must use the chainloader command like this:
-
-menuentry 'Kernel Verification' {
-    chainloader /bzImage.signed root=/dev/sdb2 rw rootwait
-}
-
-Note:
-- The kernel must be configured with CONFIG_EFI_STUB enabled.
-- The initrd command thus becomes not working because it depends on the
-linux command, implying the detached initramfs image cannot be used with
-the verification. To work around this issue, the initramfs can be bundled with
-bzImage during the build, and thus the initrd image is trusted and verified
-along with the kernel. 
-- Alternately, use initrd= argument in this way to load the detached initramfs
-  even though it is not trusted and verified:
-    chainloader /bzImage.signed root=/dev/sdb2 rw rootwait initrd=<initrd>
+- Boot to the system with the protection provided by UEFI Secure Boot

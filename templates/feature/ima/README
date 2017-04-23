@@ -128,7 +128,7 @@ allowed to define the use them during the installation.
   Define the IMA_PUBKEY variable, pointing to the path of public key file.
   Define the IMA_PRIVKEY variable, pointing to the path of private key file.
 
-Refer to feature/user-key-store-test for the details about how to generate/use
+Refer to README.user-key-store for the details about how to generate/use
 the keys owned by the user.
 
 Note:

@@ -21,22 +21,13 @@ this entry point expects to be called with SysV ABI rather than MSABI, and
 so calls to it should not be wrapped.
 [ End of Quote ]
 
-With the SELoader support, the grub.cfg, kernel (even without EFI stub support)
-and initrd can be validated as well.
-
-In addition, the grub can lock the editor, rescue and cmdline modes to prevent
-from tampering the kernel commandline in a boot option or overwriting the
-default kernel commandline. This lockdown protection can defeat the attempts to
-disable the kernel security mechanisms.
-
-Therefore, using UEFI Secure Boot, the shim loader and the SELoader together,
-the boot process is completely trustworthy.
-
 A complete verification flow with MOK Secure Boot is:
+
 UEFI BIOS boot manager (UEFI Secure Boot enabled) ->
     shim (verified by DB certificate) ->
         SELoader (verified by shim-managed certificates) ->
             grub (verified by shim-managed certificates) ->
+                grub.cfg (verified by shim-managed certificates)
                 kernel (verified by shim-managed certificates)
                 initramfs (verified by shim-managed certificates)
 
@@ -47,28 +38,29 @@ with a default certificate used to verify the bootloader and issued by
 Microsoft Corporation UEFI CA 2011. This kind of hardware is so-called
 Microsoft certificated hardware.
 
-Obviously, this requirement needs the bootloader directly loaded by BIOS
-must be signed by Microsoft. Microsoft provides the signing service
-(not free), but only accept shim loader for Linux world. Refer to
-Microsoft's signing policy from here:
+Obviously, this requirement needs a bootloader loaded by BIOS must be signed
+by Microsoft. Microsoft provides the signing service (not free), but only
+accept shim loader for Linux world. Refer to Microsoft's signing policy from
+here:
 http://blogs.msdn.com/b/windows_hardware_certification/archive/2013/12/03/microsoft-uefi-ca-signing-policy-updates.aspx
 
 Of course, the user can manually remove all default certificates and use
-the self-owned keys to have a working UEFI Secure Boot, but this is not
-working for ODM/OEM customers because this extra step is bad for the user
+the self-owned keys to provision UEFI Secure Boot, but this is not practical
+for ODM/OEM devices because this manual provision is bad for the user
 experience. Refer to the section "Out-of-box Experience" in
 feature/efi-secure-boot/README for the details.
 
 For a good user experience, shim + SELoader + grub is an excellent combination
-to handle Microsoft certificated hardware. With this model, grub is signed by
-the vendor certificate or MOK certificate without being subject to the limit
-from Microsoft's signing policy, and the extra step is thus omitted.
+to handle Microsoft certificated hardware. With this model, SELoader and grub
+are signed by the vendor certificate or MOK certificate without being subject
+to the limit from Microsoft's signing policy, and the manual provision is thus
+unnecessary.
 
 Build
 =====
 
 In order to enable this feature, add the path to
-feature/mok-secure-boot/template.conf to the init script.
+feature/mok-secure-boot/template.conf to conf/local.conf.
 
 Dependency
 ==========
@@ -78,10 +70,13 @@ This feature depends on feature/efi-secure-boot.
 Key Management
 ==============
 
+Refer to README.user-key-store for the initial cognition about key management
+for MOK Secure Boot.
+
 Note that the sample key and user key are the concepts in the key signing
 model according to the ownership and secrecy. In MOK Secure Boot, the policy
-object such as shim certificate, vendor certificate and MOK certificate will
-be mapped to a key managed by the key signing model.
+object such as shim certificate, vendor certificate and MOK certificate is
+mapped to a key managed by the user key store.
 
 Sample keys
 -----------
@@ -116,7 +111,7 @@ uses the following key pairs:
 
 User Keys
 ---------
-Refer to feature/user-key-store for the details about how to generate/use the
+Refer to README.user-key-store for the details about how to generate/use the
 keys owned by the user.
 
 Automatic Certificate Provision
@@ -269,9 +264,9 @@ after exiting MOK Manager.
 Verification
 ============
 
-By default, the build system will use DB.key to automatically sign shim, and use
-vendor_cert.key to sign SELoader, grub.cfg, kernel and initramfs images during
-the build.
+By default, the build system uses DB.key to sign shim, and uses vendor_cert.key
+to sign SELoader, grub, grub configuration file, kernel and initramfs image
+during the build.
 
 Shim Loader Verification
 ------------------------
@@ -314,31 +309,31 @@ boot process is completely trustworthy.
 
 See more details about the SELoader in its README file.
 
-Grub Loader Verification
-------------------------
-When the SELoader loads grub, if both UEFI Secure Boot and MOK Secure Boot are
-already enabled, SELoader uses a list of certificate to check the integrity of
-grub.
+Bootloader Verification
+-----------------------
+When the shim loads SELoader and SELoader loads grub, if both UEFI Secure Boot
+and MOK Secure Boot are already enabled, the upper bootloader uses a list of
+certificate to check the integrity of lower bootloader.
 
 - Blacklist check
-  If grub is signed with a key corresponding to a certificate within any of a
-  policy object below, the boot failure will occur.
+  If the lower bootloader is signed with a key corresponding to a certificate
+  within any of a policy object below, the boot failure will occur.
 
   * Vendor DBX
   * DBX
   * MokListX (MOK certificate blacklist)
 
 - Whitelist check
-  If grub is signed with a key corresponding to a certificate within any of a
-  policy object below, the boot success will occur.
+  If the lower bootloader is signed with a key corresponding to a certificate
+  within any of a policy object below, the boot success will occur.
 
   * DB
   * MokList (MOK certificate whitelist)
   * Shim certificate (only for PE image)
   * Vendor certificate
 
-If grub is not signed or signed by a key not corresponding to any policy
-objects mentioned above, the boot failure will occur.
+If the lower bootloader is not signed or signed by a key not corresponding to
+any policy objects mentioned above, the boot failure will occur.
 
 The benefit of these behaviors allow the end user to regulate the secure boot
 even without the ownership of DB on Microsoft certificated hardware.
@@ -348,7 +343,7 @@ Grub Configuration File Verification
 Grub can call the MOK2 verification protocol registered by the SELoader
 to validate the integrity of grub configuration file before parsing it.
 
-This protection prevents from tampering the grub configiration file from
+This protection prevents from tampering the grub configuration file from
 disabling certains kernel security mechanism such as selinux, IMA and so on.
 
 Kernel Verification
@@ -380,7 +375,7 @@ Work Flow For The First Boot
 - Boot up the target board
 
 - Enter to BIOS setup and remove the enrolled certificates
-  * It is recommended to turn on UEFI Secure Boot option if allowed.
+  * It is recommended to still turn on UEFI Secure Boot option if allowed.
 
 - Launch a reboot via ctrl + alt + del
   * Otherwise, a misleading error message about the verification failure

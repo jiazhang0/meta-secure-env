@@ -30,17 +30,8 @@ the purposes of development and demonstration. It is not recommended that
 this sample key be used for a production device and should be replaced by
 a secret key owned by the user. 
 
-Refer to feature/user-key-store-test/README for more details about how to
-construct an user key store.
-
-User key store test
--------------------
-This feature automatically constructs an user key store during the build.
-In a similar manner to the case of using sample key, all related binaries
-are signed and contained in RPM and rootfs image. In addition, the resulting
-user key store is located at $build/tmp/deploy/images/<machine>/user-keys/.
-
-Refer to feature/user-key-store-test/README for more details.
+Refer to README.user-key-store for more details about how to construct an user
+key store.
 
 TPM 1.2
 -------
