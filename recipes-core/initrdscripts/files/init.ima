@@ -85,6 +85,11 @@ function trap_handler
 
 trap "trap_handler $?" SIGINT EXIT
 
+if grep -q "ima_appraise=off" "${ROOT_DIR}/proc/cmdline"; then
+    print_info "Skip to load the public key and IMA policy"
+    exit 0
+fi
+
 if ! grep -q securityfs "${ROOT_DIR}/proc/mounts"; then
    ! mount -t securityfs none "$SECURITYFS_DIR" 2>"${ROOT_DIR}/dev/null" && {
        print_error "Unable to mount securityfs filesystem"
@@ -104,27 +109,23 @@ fi
 [ ! -d "$securityfs_dir/ima" ] &&
     print_info "IMA is not enabled. Exiting ..." && exit 2
 
-if grep -q "ima_appraise=off" "${ROOT_DIR}/proc/cmdline"; then
-    print_info "Skip to load the public key for IMA appraisal"
-else
-    keyring_id=`keyctl newring _ima @u`
+keyring_id=`keyctl newring _ima @u`
 
-    for key in /etc/keys/pubkey_evm*.pem ${ROOT_DIR}/etc/keys/pubkey_evm*.pem; do
-        [ ! -s "$key" ] && continue
+for key in /etc/keys/pubkey_evm*.pem ${ROOT_DIR}/etc/keys/pubkey_evm*.pem; do
+    [ ! -s "$key" ] && continue
 
-        if ! evmctl import --rsa "$key" $keyring_id >"${ROOT_DIR}/dev/null"; then
-            print_critical "Unable to load the public key $key for IMA appraisal"
-        else
-            PUBKEY_LOADED=1
-            print_verbose "The public key $key loaded for IMA appraisal"
-        fi
-    done
+    if ! evmctl import --rsa "$key" $keyring_id >"${ROOT_DIR}/dev/null"; then
+        print_critical "Unable to load the public key $key for IMA appraisal"
+    else
+        PUBKEY_LOADED=1
+        print_verbose "The public key $key loaded for IMA appraisal"
+    fi
+done
 
-    [ $PUBKEY_LOADED -ne 1 ] && {
-        print_warning "No public key loaded"
-        exit 3
-    }
-fi
+[ $PUBKEY_LOADED -ne 1 ] && {
+    print_warning "No public key loaded"
+    exit 3
+}
 
 # Attempt to load the default policy.
 [ ! -f "${IMA_POLICY}" ] && IMA_POLICY="${IMA_POLICY}.default"
