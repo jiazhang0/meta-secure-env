@@ -31,7 +31,7 @@ Build
 =====
 
 In order to enable this feature, add the path to
-feature/uefi-secure-boot/template.conf to conf/local.conf.
+feature/efi-secure-boot/template.conf to conf/local.conf.
 
 Dependency
 ==========

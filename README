@@ -12,7 +12,7 @@ key. Whenever this feature is enabled, the bootloader and kernel will be
 signed automatically during the build, implying the signed binaries are
 contained by the resulting RPM and rootfs image.
 
-Refer to feature/uefi-secure-boot/README for more details.
+Refer to feature/efi-secure-boot/README for more details.
 
 Mok Secure Boot
 ---------------
