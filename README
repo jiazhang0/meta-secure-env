@@ -63,7 +63,7 @@ which provides transparent encryption of block devices using the kernel crypto
 API. Additionally, the utility cryptsetup is used to conveniently setup disk
 encryption based on device-mapper crypt target.
 
-Refer to feature/storage-encryption/README for more details.
+Refer to feature/encrypted-storage/README for more details.
 
 IMA
 ---
