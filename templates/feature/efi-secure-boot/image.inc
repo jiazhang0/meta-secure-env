@@ -2,4 +2,4 @@
 # Copyright (C) 2017 Wind River Systems, Inc.
 #
 
-feature/efi-secure-boot
+IMAGE_INSTALL += "packagegroup-efi-secure-boot"
